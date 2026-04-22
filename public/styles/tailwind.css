@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .page-break {
+    page-break-before: always;
+  }
+  
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+}

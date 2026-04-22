@@ -1,0 +1,755 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@media print {
+  .no-print, 
+  aside, 
+  header, 
+  button, 
+  .fixed, 
+  .sticky, 
+  [role="dialog"],
+  .sidebar-container {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .print-break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .print-container {
+    padding: 20mm !important;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 48 96% 48%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 48 96% 91%;
+    --secondary-foreground: 48 30% 10%;
+    --muted: 48 96% 95%;
+    --muted-foreground: 48 30% 46.1%;
+    --accent: 48 96% 89%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 200 98% 39%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 200 98% 39%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 200 98% 39%;
+  }
+}
+
+@layer components {
+  /* Day Header */
+  .itinerary-day-header {
+    @apply bg-yellow-500 text-black px-3 py-2;
+  }
+
+  /* Event Cards */
+  .itinerary-event-card {
+    @apply bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-all;
+  }
+
+  .summary-event-card {
+    @apply bg-white border border-gray-100 rounded shadow-sm hover:shadow-md transition-all;
+  }
+
+  /* Meal Indicators */
+  .meal-indicator {
+    @apply flex items-center gap-2 text-xs font-medium;
+  }
+
+  .meal-indicator.included {
+    @apply text-green-600;
+  }
+
+  .meal-indicator.not-included {
+    @apply text-gray-400;
+  }
+
+  .meal-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .meal-dot.included {
+    @apply bg-yellow-500;
+  }
+
+  .meal-dot.not-included {
+    @apply bg-yellow-200;
+  }
+
+  /* Hotel Check-in/Check-out */
+  .hotel-checkin-checkout {
+    @apply grid grid-cols-2 gap-3 p-2 bg-yellow-50 rounded-lg;
+  }
+
+  .checkin-checkout-label {
+    @apply text-xs text-yellow-700 font-medium uppercase;
+  }
+
+  .checkin-checkout-time {
+    @apply text-sm font-semibold text-yellow-900;
+  }
+
+  /* Component Colors */
+  .event-transfer {
+    @apply bg-yellow-50 border-yellow-300;
+  }
+
+  .event-hotel {
+    @apply bg-yellow-100 border-yellow-400;
+  }
+
+  .event-activity {
+    @apply bg-yellow-50 border-yellow-300;
+  }
+
+  .event-meal {
+    @apply bg-yellow-100 border-yellow-400;
+  }
+
+  /* Additional Sections */
+  .additional-section {
+    @apply p-2 border rounded-lg mb-3;
+  }
+
+  .additional-section-title {
+    @apply text-lg font-semibold mb-2;
+  }
+
+  /* Drag and Drop */
+  .drag-over {
+    @apply border-blue-400;
+  }
+
+  .dragging {
+    @apply opacity-50;
+  }
+
+  /* View Toggle */
+  .view-toggle {
+    @apply flex items-center gap-2 text-sm font-medium;
+  }
+
+  /* Component Placeholder */
+  .component-placeholder {
+    @apply p-2 border-2 border-dashed rounded-lg mb-2 bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors;
+  }
+}
+
+@layer base {
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 200 98% 39%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 200 98% 39%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-neutral-50 text-neutral-900 font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Typography Classes */
+  .text-heading-xl {
+    @apply text-xl font-semibold text-neutral-900;
+  }
+
+  .text-heading-lg {
+    @apply text-lg font-semibold text-neutral-900;
+  }
+
+  .text-heading-md {
+    @apply text-base font-semibold text-neutral-900;
+  }
+
+  .text-heading-sm {
+    @apply text-sm font-semibold text-neutral-900;
+  }
+
+  .text-body-lg {
+    @apply text-lg font-normal text-neutral-700;
+  }
+
+  .text-body-md {
+    @apply text-base font-normal text-neutral-700;
+  }
+
+  .text-body-sm {
+    @apply text-sm font-normal text-neutral-600;
+  }
+
+  .text-body-xs {
+    @apply text-xs font-normal text-neutral-600;
+  }
+
+  .text-label-lg {
+    @apply text-sm font-medium text-neutral-900;
+  }
+
+  .text-label-md {
+    @apply text-sm font-medium text-neutral-800;
+  }
+
+  .text-label-sm {
+    @apply text-xs font-medium text-neutral-700;
+  }
+}
+
+@layer components {
+  /* Brand Button Styles */
+  .btn-primary {
+    @apply bg-brand-primary-500 hover:bg-brand-primary-600 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-brand-md hover:shadow-brand-lg transform hover:scale-105;
+  }
+
+  .btn-secondary {
+    @apply bg-brand-secondary-500 hover:bg-brand-secondary-600 text-white font-medium px-4 py-2 rounded-lg transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border border-brand-primary-300 text-brand-primary-600 hover:bg-brand-primary-50 font-medium px-4 py-2 rounded-lg transition-colors duration-200;
+  }
+
+  .btn-ghost {
+    @apply text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 font-medium px-4 py-2 rounded-lg transition-colors duration-200;
+  }
+
+  /* Card Styles */
+  .card-elevated {
+    @apply bg-white rounded-xl shadow-brand-md border border-neutral-200 hover:shadow-brand-lg transition-shadow duration-200;
+  }
+
+  .card-flat {
+    @apply bg-white rounded-lg border border-neutral-200;
+  }
+
+  /* Input Styles */
+  .input-field {
+    @apply w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-brand-primary-500 focus:border-brand-primary-500 transition-colors duration-200 text-neutral-900 placeholder-neutral-500;
+  }
+
+  /* Status Badges */
+  .badge-success {
+    @apply bg-success-100 text-success-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-warning {
+    @apply bg-warning-100 text-warning-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-error {
+    @apply bg-error-100 text-error-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-info {
+    @apply bg-brand-primary-100 text-brand-primary-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  /* Navigation Styles */
+  .nav-item {
+    @apply flex items-center px-3 py-2 rounded-lg text-neutral-700 hover:text-brand-primary-600 hover:bg-brand-primary-50 transition-colors duration-200 font-medium;
+  }
+
+  .nav-item-active {
+    @apply flex items-center px-3 py-2 rounded-lg text-brand-primary-600 bg-brand-primary-100 font-medium;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Currency Symbol Styling */
+.currency-symbol {
+  @apply font-semibold;
+}
+
+/* Responsive Image Handling */
+.event-image {
+  @apply w-full h-full object-cover;
+}
+
+.event-image-placeholder {
+  @apply w-full h-full bg-gray-200 flex items-center justify-center;
+}
+
+/* Collapsible Day Styles */
+.day-collapsed {
+  @apply overflow-hidden;
+}
+
+.day-expanded {
+  @apply overflow-visible;
+}
+
+/* Edit Button Styles */
+.edit-event-btn {
+  @apply text-blue-600 hover:text-blue-700 transition-colors;
+}
+
+/* Inclusion Tags */
+.inclusion-tag {
+  @apply text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded;
+}
+
+/* Time Display */
+.event-time {
+  @apply flex items-center text-sm text-gray-600;
+}
+
+.event-time-icon {
+  @apply h-4 w-4 mr-1;
+}
+
+/* Focus styles for accessibility */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-brand-primary-500 focus:ring-offset-2;
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Modern card hover effects */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-brand-lg hover:scale-[1.02];
+}
+
+/* Text truncation utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  .mobile-full-width {
+    @apply w-full;
+  }
+  
+  .mobile-text-center {
+    @apply text-center;
+  }
+  
+  .mobile-px-4 {
+    @apply px-4;
+  }
+  
+  .event-card-image {
+    @apply h-32;
+  }
+  
+  .day-header {
+    @apply px-4 py-3;
+  }
+  
+  .event-card-content {
+    @apply p-3;
+  }
+  
+  .hotel-checkin-checkout {
+    @apply grid-cols-1 gap-2;
+  }
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Itinerary Builder Specific Styles */
+.itinerary-day-header {
+  @apply bg-yellow-500 text-black font-bold;
+}
+
+.itinerary-event-card {
+  @apply bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-all;
+}
+
+.meal-indicator {
+  @apply flex items-center space-x-1 text-xs font-medium;
+}
+
+.meal-indicator.included {
+  @apply text-green-600;
+}
+
+.meal-indicator.not-included {
+  @apply text-gray-600;
+}
+
+.meal-dot {
+  @apply w-3 h-3 rounded-full;
+}
+
+.meal-dot.included {
+  @apply bg-green-500;
+}
+
+.meal-dot.not-included {
+  @apply bg-gray-300;
+}
+
+.event-card-image {
+  @apply h-28 bg-gray-200 relative overflow-hidden;
+}
+
+.event-card-badge {
+  @apply absolute top-2 left-2 bg-white/90 text-gray-900 font-medium px-2 py-1 rounded text-xs;
+}
+
+.event-card-content {
+  @apply p-2;
+}
+
+.event-card-title {
+  @apply font-semibold text-gray-900 mb-1;
+}
+
+.event-card-description {
+  @apply text-sm text-gray-600 mb-2;
+}
+
+.event-card-location {
+  @apply flex items-center text-sm text-gray-500 mb-2;
+}
+
+.event-card-price {
+  @apply text-lg font-bold text-gray-900;
+}
+
+.event-card-price-label {
+  @apply text-sm text-gray-500;
+}
+
+.hotel-checkin-checkout {
+  @apply grid grid-cols-2 gap-3 mb-2 p-2 bg-gray-50 rounded-lg;
+}
+
+.checkin-checkout-label {
+  @apply text-xs text-gray-500 font-medium uppercase;
+}
+
+.checkin-checkout-time {
+  @apply text-sm font-semibold text-gray-900;
+}
+
+/* Meal Inclusion Indicators */
+.meal-inclusions {
+  @apply flex items-center space-x-4 mb-3;
+}
+
+.meal-inclusion-item {
+  @apply flex items-center space-x-1;
+}
+
+.meal-inclusion-dot {
+  @apply w-3 h-3 rounded-full;
+}
+
+.meal-inclusion-dot.included {
+  @apply bg-green-500;
+}
+
+.meal-inclusion-dot.not-included {
+  @apply bg-gray-300;
+}
+
+.meal-inclusion-label {
+  @apply text-xs font-medium;
+}
+
+/* Day Header Styles */
+.day-header {
+  @apply bg-yellow-500 text-black cursor-pointer hover:bg-yellow-600 transition-colors;
+}
+
+.day-badge {
+  @apply bg-yellow-600 text-white px-3 py-1 text-sm font-bold rounded;
+}
+
+.day-title {
+  @apply text-lg font-bold text-black;
+}
+
+.day-date {
+  @apply text-black/80;
+}
+
+.day-number {
+  @apply text-2xl font-bold text-black;
+}
+
+.day-month {
+  @apply text-sm text-black/80;
+}
+
+.component-placeholder {
+  @apply border-2 border-dashed cursor-grab hover:shadow-md transition-shadow;
+}
+
+.drag-over {
+  @apply bg-blue-50 border-blue-300;
+}
+
+.event-transfer {
+  @apply bg-blue-50 border-blue-200;
+}
+
+.event-hotel {
+  @apply bg-green-50 border-green-200;
+}
+
+.event-activity {
+  @apply bg-purple-50 border-purple-200;
+}
+
+.event-flight {
+  @apply bg-orange-50 border-orange-200;
+}
+
+.event-meal {
+  @apply bg-yellow-50 border-yellow-200;
+}
+
+.event-photo {
+  @apply bg-pink-50 border-pink-200;
+}
+
+.pricing-summary {
+  @apply bg-white rounded-lg border p-4 shadow-sm;
+}
+
+.book-now-btn {
+  @apply bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3 rounded transition-colors shadow-sm;
+}
+
+.add-to-cart-btn {
+  @apply border border-blue-600 text-blue-600 hover:bg-blue-50 px-6 py-2 rounded transition-colors;
+}
+
+.send-enquiry-btn {
+  @apply bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3 rounded transition-colors shadow-sm;
+}
+
+/* Form Styles for Enquiry */
+.enquiry-form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors;
+}
+
+.enquiry-form-select {
+  @apply w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors bg-white;
+}
+
+/* View Toggle Styles */
+.view-toggle-tabs {
+  @apply bg-gray-100;
+}
+
+.view-toggle-tab {
+  @apply data-[state=active]:bg-white data-[state=active]:text-black font-medium;
+}
+
+/* Summary View Styles */
+.summary-event-card {
+  @apply flex items-center space-x-3 p-3 bg-white rounded-lg border hover:shadow-sm transition-shadow;
+}
+
+.summary-event-icon {
+  @apply h-5 w-5 text-gray-600 flex-shrink-0;
+}
+
+.summary-event-content {
+  @apply flex-1;
+}
+
+.summary-event-title {
+  @apply font-medium text-gray-900;
+}
+
+.summary-event-time {
+  @apply text-sm text-gray-600;
+}
+
+.summary-event-price {
+  @apply text-sm font-medium text-blue-600;
+}
+
+/* Pinterest-style Masonry Gallery Flex Utilities */
+.flex-2 {
+  flex: 2;
+}
+
+.flex-3 {
+  flex: 3;
+}
+
+.flex-4 {
+  flex: 4;
+}
+
+/* Custom Scrollbar Styling */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Custom scrollbar for library items - Chrome/Safari/Firefox */
+.library-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #e5e7eb;
+}
+
+.library-scrollbar::-webkit-scrollbar {
+  width: 12px !important;
+}
+
+.library-scrollbar::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.library-scrollbar::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 6px;
+  background-clip: padding-box;
+  border: 2px solid #e5e7eb;
+  min-height: 40px;
+}
+
+.library-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+  background-clip: padding-box;
+  border: 2px solid #e5e7eb;
+}
+

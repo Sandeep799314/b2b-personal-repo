@@ -1,0 +1,5 @@
+Note that on the right side, in the create new iternary, we should be able to see the library components along with manual components,
+
+Why its not visible, do deep analysis, make sure that all th e components of libary should be accessible while creating an iternery, 
+
+Understand what needs to be done, make sure that everything works end-to-end

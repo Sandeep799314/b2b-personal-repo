@@ -1,0 +1,188 @@
+"use client"
+
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { IItineraryEvent } from "@/models/Itinerary"
+import { Label } from "@/components/ui/label"
+
+interface EditEventModalProps {
+  event: IItineraryEvent
+  isOpen: boolean
+  onClose: () => void
+  onSave: (updatedEvent: IItineraryEvent) => void
+}
+
+export function EditEventModal({ event, isOpen, onClose, onSave }: EditEventModalProps) {
+  const [editedEvent, setEditedEvent] = useState<IItineraryEvent>({ ...event })
+
+  const handleSave = () => {
+    onSave(editedEvent)
+    onClose()
+  }
+
+  const renderFields = () => {
+    switch (event.category) {
+      case 'hotel':
+        return (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="title">Hotel Name</Label>
+              <Input
+                id="title"
+                value={editedEvent.title}
+                onChange={(e) => setEditedEvent({ ...editedEvent, title: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mainPoint">Main Point</Label>
+              <Input
+                id="mainPoint"
+                value={editedEvent.mainPoint}
+                onChange={(e) => setEditedEvent({ ...editedEvent, mainPoint: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="checkIn">Check In Time</Label>
+              <Input
+                id="checkIn"
+                type="time"
+                value={editedEvent.checkIn}
+                onChange={(e) => setEditedEvent({ ...editedEvent, checkIn: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="checkOut">Check Out Time</Label>
+              <Input
+                id="checkOut"
+                type="time"
+                value={editedEvent.checkOut}
+                onChange={(e) => setEditedEvent({ ...editedEvent, checkOut: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="nights">Number of Nights</Label>
+              <Input
+                id="nights"
+                type="number"
+                value={editedEvent.nights}
+                onChange={(e) => setEditedEvent({ ...editedEvent, nights: parseInt(e.target.value) })}
+              />
+            </div>
+          </>
+        )
+
+      case 'transfer':
+        return (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                value={editedEvent.description}
+                onChange={(e) => setEditedEvent({ ...editedEvent, description: e.target.value })}
+                placeholder="e.g., Krabi Hotel to Phuket Hotel"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mainPoint">Main Point</Label>
+              <Input
+                id="mainPoint"
+                value={editedEvent.mainPoint}
+                onChange={(e) => setEditedEvent({ ...editedEvent, mainPoint: e.target.value })}
+                placeholder="e.g., Private Transfer"
+              />
+            </div>
+          </>
+        )
+
+      case 'activity':
+        return (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="title">Activity Name</Label>
+              <Input
+                id="title"
+                value={editedEvent.title}
+                onChange={(e) => setEditedEvent({ ...editedEvent, title: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mainPoint">Main Point</Label>
+              <Input
+                id="mainPoint"
+                value={editedEvent.mainPoint}
+                onChange={(e) => setEditedEvent({ ...editedEvent, mainPoint: e.target.value })}
+              />
+            </div>
+          </>
+        )
+
+      case 'flight':
+        return (
+          <>
+            <div className="grid gap-2">
+              <Label htmlFor="fromCity">From City</Label>
+              <Input
+                id="fromCity"
+                value={editedEvent.fromCity}
+                onChange={(e) => setEditedEvent({ ...editedEvent, fromCity: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="toCity">To City</Label>
+              <Input
+                id="toCity"
+                value={editedEvent.toCity}
+                onChange={(e) => setEditedEvent({ ...editedEvent, toCity: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mainPoint">Main Point</Label>
+              <Input
+                id="mainPoint"
+                value={editedEvent.mainPoint}
+                onChange={(e) => setEditedEvent({ ...editedEvent, mainPoint: e.target.value })}
+              />
+            </div>
+          </>
+        )
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Edit {event.category.charAt(0).toUpperCase() + event.category.slice(1)}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          {renderFields()}
+          <div className="grid gap-2">
+            <Label htmlFor="highlights">Highlights</Label>
+            <Textarea
+              id="highlights"
+              value={editedEvent.highlights?.join('\n')}
+              onChange={(e) => setEditedEvent({ 
+                ...editedEvent, 
+                highlights: e.target.value.split('\n').filter(line => line.trim())
+              })}
+              placeholder="Enter each highlight on a new line"
+              rows={4}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>
+            Save Changes
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

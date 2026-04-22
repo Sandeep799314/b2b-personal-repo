@@ -1,0 +1,310 @@
+"use client"
+
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { ArrowLeft, Plus, Save, Eye, Sun, Clock, Calendar, GripVertical, Plane } from "lucide-react"
+import { EventCard } from "../event-card"
+import { AdditionalSections } from "../additional-sections"
+import { DayTitle } from "./day-title"
+import { IItineraryDay, IItineraryEvent } from "@/models/Itinerary"
+
+interface ItineraryBuilderProps {
+  itineraryId?: string
+  onBack: () => void
+}
+
+const EMPTY_DAY: IItineraryDay = {
+  day: 1,
+  date: new Date().toISOString().split('T')[0],
+  title: "Day 1",
+  description: "",
+  detailedDescription: "",
+  events: [],
+  nights: 0
+}
+
+const COMPONENT_TEMPLATES = [
+  {
+    category: 'flight',
+    title: 'Flight',
+    icon: Plane,
+    color: 'bg-sky-50 border-sky-200'
+  },
+  {
+    category: 'transfer',
+    title: 'Transfer',
+    icon: Clock,
+    color: 'bg-blue-50 border-blue-200'
+  },
+  {
+    category: 'hotel',
+    title: 'Hotel',
+    icon: Sun,
+    color: 'bg-green-50 border-green-200'
+  },
+  {
+    category: 'activity',
+    title: 'Activity',
+    icon: Calendar,
+    color: 'bg-purple-50 border-purple-200'
+  }
+]
+
+export function ItineraryBuilder({ itineraryId, onBack }: ItineraryBuilderProps) {
+  const [days, setDays] = useState<IItineraryDay[]>([EMPTY_DAY])
+  const [title, setTitle] = useState('New Itinerary')
+  const [description, setDescription] = useState('')
+  const [isDetailedView, setIsDetailedView] = useState(true)
+  const [additionalSections, setAdditionalSections] = useState<Record<string, string>>({})
+  
+  // Drag and drop state
+  const [draggedItem, setDraggedItem] = useState<{
+    type: 'component' | 'event'
+    item: any
+    sourceDay?: number
+    sourceIndex?: number
+  } | null>(null)
+  const [dropTarget, setDropTarget] = useState<{dayIndex: number, position: number} | null>(null)
+
+  const handleDragStart = (type: 'component' | 'event', item: any, dayIndex?: number, eventIndex?: number) => {
+    setDraggedItem({ type, item, sourceDay: dayIndex, sourceIndex: eventIndex })
+  }
+
+  const handleDragOver = (dayIndex: number, position: number) => {
+    setDropTarget({ dayIndex, position })
+  }
+
+  const handleDrop = (dayIndex: number, position: number) => {
+    if (!draggedItem) return
+
+    const newDays = [...days]
+
+    if (draggedItem.type === 'component') {
+      // Create new event from template
+      const newEvent: IItineraryEvent = {
+        id: `event-${Date.now()}`,
+        category: draggedItem.item.category,
+        title: `New ${draggedItem.item.title}`,
+        description: '',
+        time: '09:00',
+        location: '',
+        inclusions: [],
+        price: 0,
+        ...(draggedItem.item.category === 'hotel' && {
+          checkIn: '14:00',
+          checkOut: '12:00',
+          meals: {
+            breakfast: true,
+            lunch: false,
+            dinner: false
+          }
+        })
+      }
+
+      newDays[dayIndex].events.splice(position, 0, newEvent)
+    } else if (draggedItem.type === 'event' && draggedItem.sourceDay !== undefined && draggedItem.sourceIndex !== undefined) {
+      // Move existing event
+      const [movedEvent] = newDays[draggedItem.sourceDay].events.splice(draggedItem.sourceIndex, 1)
+      newDays[dayIndex].events.splice(position, 0, movedEvent)
+    }
+
+    setDays(newDays)
+    setDraggedItem(null)
+    setDropTarget(null)
+  }
+
+  const updateDayTitle = (dayIndex: number, newTitle: string) => {
+    const newDays = [...days];
+    newDays[dayIndex].title = newTitle;
+    setDays(newDays);
+  };
+
+  const updateDayDescription = (dayIndex: number, newDescription: string, isDetailed: boolean = false) => {
+    const newDays = [...days];
+    if (isDetailed) {
+      newDays[dayIndex].detailedDescription = newDescription;
+    } else {
+      newDays[dayIndex].description = newDescription;
+    }
+    setDays(newDays);
+  };
+
+  const updateDayNights = (dayIndex: number, nights: string) => {
+    const newDays = [...days];
+    newDays[dayIndex].nights = parseInt(nights) || 0;
+    setDays(newDays);
+  };
+
+  const addDay = () => {
+    const newDay = {
+      ...EMPTY_DAY,
+      day: days.length + 1,
+      title: `Day ${days.length + 1}`,
+      date: new Date(Date.now() + days.length * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    }
+    setDays([...days, newDay])
+  }
+
+  return (
+    <div className="flex h-full">
+      <div className="flex-1 p-6 overflow-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" onClick={onBack}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-2xl font-bold border-none p-0 h-auto bg-transparent"
+                placeholder="Enter Itinerary Title"
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={isDetailedView}
+                onCheckedChange={setIsDetailedView}
+              />
+              <span className="text-sm font-medium">
+                {isDetailedView ? 'Detailed View' : 'Summary View'}
+              </span>
+            </div>
+            <Button>
+              <Save className="mr-2 h-4 w-4" />
+              Save
+            </Button>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="mb-6">
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Enter itinerary description..."
+            className="resize-none"
+            rows={2}
+          />
+        </div>
+
+        {/* Days */}
+        <div className="space-y-6">
+          {days.map((day, dayIndex) => (
+            <Card 
+              key={dayIndex} 
+              className={`relative border-2 ${dropTarget?.dayIndex === dayIndex ? 'border-blue-400' : 'border-gray-200'}`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                handleDragOver(dayIndex, day.events.length)
+              }}
+              onDrop={() => handleDrop(dayIndex, day.events.length)}
+            >
+              <CardHeader className="pb-0">
+                <div className="flex items-center justify-between">
+                  <DayTitle
+                    day={day.day}
+                    title={day.title}
+                    nights={day.nights}
+                    onTitleChange={(newTitle) => updateDayTitle(dayIndex, newTitle)}
+                    onNightsChange={(newNights) => updateDayNights(dayIndex, newNights)}
+                  />
+                  <Button variant="ghost" size="sm" onClick={() => setIsDetailedView(!isDetailedView)}>
+                    <Eye className="h-4 w-4 mr-1" />
+                    {isDetailedView ? 'Hide Details' : 'Show Details'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isDetailedView ? (
+                  <div className="space-y-4 mt-4">
+                    <Textarea
+                      value={day.detailedDescription || ''}
+                      onChange={(e) => updateDayDescription(dayIndex, e.target.value, true)}
+                      placeholder="Enter detailed description for this day..."
+                      className="resize-none"
+                      rows={3}
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-2">
+                    <Input
+                      value={day.description || ''}
+                      onChange={(e) => updateDayDescription(dayIndex, e.target.value)}
+                      placeholder="Enter brief description..."
+                      className="border-none p-0 bg-transparent"
+                    />
+                  </div>
+                )}
+
+                {/* Events */}
+                <div className="mt-4 space-y-4">
+                  {day.events.map((event, eventIndex) => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      isDetailedView={isDetailedView}
+                      onDragStart={() => handleDragStart('event', event, dayIndex, eventIndex)}
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          ))}
+        </div>
+
+        {/* Add Day Button */}
+        <div className="mt-6 text-center">
+          <Button onClick={addDay} variant="outline" className="border-dashed border-2">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Day
+          </Button>
+        </div>
+
+        {/* Additional Sections */}
+        <div className="mt-8">
+          <AdditionalSections
+            sections={additionalSections}
+            onUpdate={setAdditionalSections}
+          />
+        </div>
+      </div>
+
+      {/* Component Sidebar */}
+      <div className="w-80 border-l bg-white p-4 overflow-auto">
+        <h3 className="font-semibold text-lg mb-4">Components</h3>
+        <div className="space-y-3">
+          {COMPONENT_TEMPLATES.map((component) => {
+            const Icon = component.icon;
+            return (
+              <Card
+                key={component.category}
+                className={`${component.color} cursor-move`}
+                draggable
+                onDragStart={() => handleDragStart('component', component)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center space-x-2">
+                    <GripVertical className="h-4 w-4 text-gray-400" />
+                    <Icon className="h-4 w-4" />
+                    <span className="font-medium">{component.title}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
