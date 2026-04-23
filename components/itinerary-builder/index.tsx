@@ -26,6 +26,7 @@ import {
   Car,
   MapPin,
   Camera,
+  Check,
   FileText,
   Shield,
   Train,
@@ -489,6 +490,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }, [mode, quotationId])
 
   const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false)
   const [showPreviewConfig, setShowPreviewConfig] = useState(false)
   const [activeSidebar, setActiveSidebar] = useState<"components" | "library">("components")
@@ -1734,6 +1736,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         }
         // Reset changes tracking after successful save
         setHasChanges(false)
+        setShowSaved(true)
+        setTimeout(() => setShowSaved(false), 2000)
       }
     } catch (error) {
       console.error("[v0] Save error:", error)
@@ -1975,18 +1979,19 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         {/* Header Card */}
         <div className="bg-white rounded-xl shadow-sm border mb-4 p-3 flex flex-col gap-0 relative">
           <div className="absolute top-3 right-3 flex items-center gap-2">
-            {hasChanges && (
-              <Badge variant="outline" className="text-orange-500 border-orange-200 bg-orange-50 mr-2">
-                Unsaved Changes
-              </Badge>
-            )}
             <Button 
               onClick={handleSave} 
               disabled={isSaving}
-              className="bg-[#2D7CEA] hover:bg-[#1e63c7] text-white shadow-md"
+              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
             >
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Changes
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : showSaved ? (
+                <Check className="mr-2 h-4 w-4" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
             </Button>
           </div>
           {/* Itinerary Title - Biggest Font Size */}

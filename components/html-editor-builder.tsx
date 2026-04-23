@@ -27,7 +27,8 @@ import {
   Redo,
   FileText,
   Smartphone,
-  Monitor
+  Monitor,
+  Check
 } from "lucide-react"
 import { IHtmlBlock } from "@/models/Itinerary"
 import { useToast } from "@/hooks/use-toast"
@@ -59,6 +60,8 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
   const [showAddBlockForm, setShowAddBlockForm] = useState(false)
   const [editingBlock, setEditingBlock] = useState<IHtmlBlock | null>(null)
   const [previewMode, setPreviewMode] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const [blockForm, setBlockForm] = useState({
     type: "paragraph" as IHtmlBlock["type"],
     content: "",
@@ -239,6 +242,7 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
   }
 
   const handleSave = async () => {
+    setIsSaving(true)
     try {
       const itineraryData = {
         productId,
@@ -279,6 +283,8 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
           title: "Success",
           description: `HTML Itinerary ${itineraryId ? "updated" : "created"} successfully`,
         })
+        setShowSaved(true)
+        setTimeout(() => setShowSaved(false), 2000)
       } else {
         throw new Error("Failed to save")
       }
@@ -289,6 +295,8 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
         description: "Failed to save HTML itinerary",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -397,9 +405,19 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
             <Eye className="h-4 w-4 mr-2" />
             {previewMode ? "Edit" : "Preview"}
           </Button>
-          <Button variant="outline" onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
+          <Button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
+          >
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : showSaved ? (
+              <Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
           </Button>
         </div>
       </div>

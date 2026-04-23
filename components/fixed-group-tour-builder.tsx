@@ -16,7 +16,9 @@ import {
   Clock,
   Plus,
   Trash2,
-  X
+  X,
+  Loader2,
+  Check
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ItineraryBuilder } from "./itinerary-builder"
@@ -53,6 +55,8 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
   // Gallery state
   const [gallery, setGallery] = useState<IGalleryItem[]>([])
   const [hasChanges, setHasChanges] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
   const isInitialLoad = useRef(true)
 
   // Load existing data if editing
@@ -200,6 +204,7 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
     }
 
     try {
+      setIsSaving(true)
       const itineraryData = {
         productId,
         title,
@@ -245,6 +250,9 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
           title: "Success",
           description: `Fixed Group Tour ${itineraryId ? "updated" : "created"} successfully`,
         })
+        setHasChanges(false)
+        setShowSaved(true)
+        setTimeout(() => setShowSaved(false), 2000)
         // Update itineraryId for future saves
         if (!itineraryId && savedData._id) {
           // Could update URL or handle navigation here
@@ -259,6 +267,8 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
         description: "Failed to save fixed group tour",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -314,9 +324,19 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
           >
             Edit Itinerary
           </Button>
-          <Button variant="outline" onClick={handleSave}>
-            <Save className="h-4 w-4 mr-2" />
-            Save
+          <Button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
+          >
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : showSaved ? (
+              <Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
           </Button>
         </div>
       </div>

@@ -30,6 +30,8 @@ import {
   Image as ImageIcon,
   FileText,
   Ship,
+  Loader2,
+  Check
 } from "lucide-react"
 import { ICartItem } from "@/models/Itinerary"
 import { useToast } from "@/hooks/use-toast"
@@ -150,6 +152,8 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   const [editingItem, setEditingItem] = useState<ICartItem | null>(null)
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
   const [draggedComponent, setDraggedComponent] = useState<any>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
 
   // Initialize form state
   const [itemForm, setItemForm] = useState<Partial<ICartItem>>({
@@ -435,6 +439,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   }
 
   const handleSave = async () => {
+    setIsSaving(true)
     try {
       const itineraryData = {
         productId,
@@ -473,6 +478,8 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
           title: "Success",
           description: `Cart/Combo ${itineraryId ? "updated" : "created"} successfully`,
         })
+        setShowSaved(true)
+        setTimeout(() => setShowSaved(false), 2000)
       } else {
         throw new Error("Failed to save")
       }
@@ -483,6 +490,8 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
         description: "Failed to save cart/combo",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -598,9 +607,19 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
               <Eye className="h-4 w-4 mr-2" />
               Preview
             </Button>
-            <Button variant="outline" onClick={handleSave}>
-              <Save className="h-4 w-4 mr-2" />
-              Save
+            <Button 
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
+            >
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : showSaved ? (
+                <Check className="mr-2 h-4 w-4" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
             </Button>
           </div>
         </div>
