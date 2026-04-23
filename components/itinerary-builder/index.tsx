@@ -1975,14 +1975,17 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </span>
         </div>
       )}
-      <div className="flex-1 p-3 overflow-y-auto h-full">
-        {/* Header Card */}
-        <div className="bg-white rounded-xl shadow-sm border mb-4 p-3 flex flex-col gap-0 relative">
-          <div className="absolute top-3 right-3 flex items-center gap-2">
+      <div className="flex-1 p-4 overflow-y-auto h-full bg-[#f8fafc]">
+        {/* Professional Header Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 mb-6 p-6 relative overflow-hidden">
+          {/* Subtle Top Accent */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
+          
+          <div className="absolute top-6 right-6 flex items-center gap-3">
             <Button 
               onClick={handleSave} 
               disabled={isSaving}
-              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
+              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
             >
               {isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1994,134 +1997,175 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
             </Button>
           </div>
-          {/* Itinerary Title - Biggest Font Size */}
-          <div className="flex items-center">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter itinerary title..."
-              className="text-5xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight truncate"
-              style={{ fontWeight: 900, lineHeight: '1.05', height: '48px' }}
-              aria-label="Itinerary title"
-              type="text"
-              spellCheck={false}
-            />
-          </div>
 
-          {/* Days and Nights */}
-          <div className="flex items-center gap-2">
-            <div className="bg-[#E8F3FF] text-[#2D7CEA] border-[#2D7CEA] border rounded-md flex items-center px-3 py-1 text-sm font-semibold select-none w-max">
-              {days.length} Days &nbsp;•&nbsp; {days.length > 0 ? days.length - 1 : 0} Nights
-            </div>
-          </div>
-
-          {/* Itinerary Description */}
-          <div className="flex flex-col gap-1 mt-1">
-            <label className="text-sm font-medium text-gray-700">
-              Itinerary Description <span className="text-red-500">*</span>
-            </label>
-            {/* Keep description as a single row until user inserts a newline. Rows are computed from value. */}
-            {(() => {
-              const lines = description ? description.split('\n').length : 1
-              const rows = Math.min(Math.max(lines, 1), 6)
-              return (
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter itinerary description..."
-                  rows={rows}
-                  className={`min-h-[40px] border-none resize-none p-0 text-base ${!description?.trim() ? 'border-red-500 border' : ''}`}
-                  aria-label="Itinerary description"
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-2">
+            {/* Left Column: Title & Main Info */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Title Section */}
+              <div className="group relative">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Itinerary Title"
+                  className="w-full text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all"
+                  style={{ fontWeight: 900 }}
+                  aria-label="Itinerary title"
+                  type="text"
+                  spellCheck={false}
                 />
-              )
-            })()}
-          </div>
+                <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-blue-500 transition-colors" />
+              </div>
 
-          {/* Destination */}
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-gray-700">
-              Destination <span className="text-red-500">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-gray-500" />
-              <Input
-                value={countries[0] || ""}
-                onChange={(e) => setCountries([e.target.value])}
-                className={`flex-1 border-none p-0 text-base font-semibold ${!countries[0]?.trim() ? 'border-red-500 border' : ''}`}
-                placeholder="Enter destination..."
-                autoComplete="off"
-              />
-            </div>
-          </div>
+              {/* Days & Nights Badge Bar */}
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center border border-blue-100">
+                  <Calendar className="w-3.5 h-3.5 mr-2" />
+                  {days.length} Days &nbsp;•&nbsp; {days.length > 0 ? days.length - 1 : 0} Nights
+                </div>
+                <div className="text-neutral-400 text-xs font-medium">
+                  {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
 
-          {/* Highlights */}
-          <div>
-            <h3 className="font-semibold mb-2">Highlights</h3>
-            <div className="flex flex-wrap gap-2 mb-2" aria-label="Highlights">
-              {highlightOptions.map((highlight) => (
-                <Badge
-                  key={highlight}
-                  variant="outline"
-                  className={`cursor-pointer ${days.some(day =>
-                    day.events.some(event => event.highlights?.includes(highlight))
+              {/* Description Box */}
+              <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
+                <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-2 block">
+                  Itinerary Narrative <span className="text-red-500">*</span>
+                </label>
+                {(() => {
+                  const lines = description ? description.split('\n').length : 1
+                  const rows = Math.min(Math.max(lines, 1), 6)
+                  return (
+                    <Textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe the journey experience..."
+                      rows={rows}
+                      className="min-h-[60px] border-none resize-none p-0 text-base bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700"
+                      aria-label="Itinerary description"
+                    />
                   )
-                    ? 'bg-[#2D7CEA] text-white'
-                    : 'bg-white text-gray-600'
-                    }`}
-                  onClick={() => toggleHighlight(highlight)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      toggleHighlight(highlight)
-                    }
-                  }}
-                >
-                  {highlight}
-                </Badge>
-              ))}
+                })()}
+              </div>
+
+              {/* Destination & Reference Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
+                    Primary Destination <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                    <Input
+                      value={countries[0] || ""}
+                      onChange={(e) => setCountries([e.target.value])}
+                      className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
+                      placeholder="Where to?"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
+                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
+                    Product Reference
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-neutral-400" />
+                    <Input
+                      value={productReferenceCode}
+                      onChange={(e) => setProductReferenceCode(e.target.value)}
+                      placeholder="Optional Code"
+                      className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
+                      aria-label="Product Reference Code"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Input
-                type="text"
-                placeholder="Add highlight"
-                value={newHighlight}
-                onChange={(e) => setNewHighlight(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newHighlight.trim()) {
-                    e.preventDefault()
-                    addHighlight(newHighlight.trim())
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button
-                onClick={() => {
-                  if (newHighlight.trim()) {
-                    addHighlight(newHighlight.trim())
-                  }
-                }}
-              >
-                Add
-              </Button>
+
+            {/* Right Column: Highlights & Tags */}
+            <div className="lg:col-span-4 flex flex-col h-full border-l border-neutral-100 lg:pl-8">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-2">
+                    <Sun className="w-4 h-4 text-amber-500" />
+                    Trip Highlights
+                  </h3>
+                  <Badge variant="secondary" className="text-[10px] bg-neutral-100 text-neutral-500 border-none">
+                    {highlightOptions.length} TOTAL
+                  </Badge>
+                </div>
+                
+                <div className="flex flex-wrap gap-1.5 mb-6 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                  {highlightOptions.map((highlight) => {
+                    const isActive = days.some(day =>
+                      day.events.some(event => event.highlights?.includes(highlight))
+                    );
+                    return (
+                      <Badge
+                        key={highlight}
+                        variant="outline"
+                        className={`cursor-pointer text-[11px] py-1 px-2.5 rounded-lg transition-all border shadow-sm ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                        onClick={() => toggleHighlight(highlight)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            toggleHighlight(highlight)
+                          }
+                        }}
+                      >
+                        {highlight}
+                      </Badge>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-auto pt-4 border-t border-neutral-50">
+                  <div className="relative group">
+                    <Input
+                      type="text"
+                      placeholder="Add custom highlight..."
+                      value={newHighlight}
+                      onChange={(e) => setNewHighlight(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newHighlight.trim()) {
+                          e.preventDefault()
+                          addHighlight(newHighlight.trim())
+                        }
+                      }}
+                      className="w-full pr-12 h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-blue-300 rounded-xl text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (newHighlight.trim()) {
+                          addHighlight(newHighlight.trim())
+                        }
+                      }}
+                      className="absolute right-1.5 top-1.5 h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-2 text-center">
+                    Press Enter to quickly add a new tag
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-
-          {/* Product Reference Code */}
-          <Input
-            value={productReferenceCode}
-            onChange={(e) => setProductReferenceCode(e.target.value)}
-            placeholder="Product Reference Code (Optional)"
-            className="text-sm border rounded-md px-2 py-1"
-            aria-label="Product Reference Code"
-          />
-
-          {/* Detailed View toggle moved next to All Inclusions button */}
         </div>
 
         {/* Action Buttons Block */}
-        <div className="bg-white rounded-xl shadow-sm border mb-1 p-1.5">
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-2 p-2">
           <div className="flex flex-wrap justify-between items-center gap-2">
             {/* Left Buttons */}
             <div className="flex space-x-2 flex-wrap items-center">
