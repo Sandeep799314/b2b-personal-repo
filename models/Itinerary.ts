@@ -15,6 +15,8 @@ export interface IItinerary {
   duration: string
   totalPrice: number
   currency: string
+  markupType?: "percentage" | "amount"
+  markupValue?: number
   status?: "published" | "archived" | "draft"
   type: "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor" // NEW: Itinerary types
   createdBy: string
@@ -605,6 +607,8 @@ const ItinerarySchema = new mongoose.Schema(
     duration: { type: String },
     totalPrice: { type: Number, default: 0 },
     currency: { type: String, default: "USD" },
+    markupType: { type: String, enum: ["percentage", "amount"], default: "amount" },
+    markupValue: { type: Number, default: 0 },
 
     type: {
       type: String,

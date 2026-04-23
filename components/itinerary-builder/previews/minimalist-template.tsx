@@ -27,7 +27,8 @@ import {
     Train,
     Bus
 } from "lucide-react"
-import { calculateComponentPrice, PricingConfig, calculateTotalPrice } from "@/lib/pricing-calculator"
+import { calculateComponentPrice, PricingConfig, calculateTotalPrice, getExchangeRates as getGlobalRates } from "@/lib/pricing-calculator"
+import { convertCurrency } from "@/lib/currency-utils"
 
 interface MinimalistTemplateProps {
     itinerary: any
@@ -358,7 +359,34 @@ export function MinimalistTemplate({ itinerary, showPrices, showItemizedPrices =
 
     // Calculate total price using pricing calculator
     const allEvents = days.flatMap((day: any) => day.events || [])
-    const { total: calculatedTotal, displayTotal } = calculateTotalPrice(allEvents, pricingConfig)
+    const { total: basePrice } = calculateTotalPrice(allEvents, pricingConfig)
+
+    // Calculate markup
+    let markupAmount = 0
+    if (itinerary.markupType === "percentage") {
+        markupAmount = basePrice * (itinerary.markupValue || 0) / 100
+    } else if (itinerary.markupType === "amount" && itinerary.markupValue) {
+        // Convert markup value from original itinerary currency to target currency
+        const { rates, baseCurrency: globalBase } = (exchangeRates && Object.keys(exchangeRates).length > 0)
+            ? { rates: exchangeRates, baseCurrency: 'INR' } // Assume INR is base if not specified
+            : getGlobalRates()
+            
+        markupAmount = convertCurrency(
+            itinerary.markupValue,
+            itinerary.currency || "INR",
+            currency,
+            rates,
+            globalBase
+        )
+    }
+
+    const finalTotal = basePrice + markupAmount
+    const displayTotal = new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(finalTotal)
 
     // Date helpers
     const getStartDate = () => {

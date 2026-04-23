@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,6 +44,7 @@ import {
   MessageCircle,
   Mail,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { EventCard } from "./event-card"
 import { DayTitle } from "./day-title"
 import { DayMeals } from "./day-meals"
@@ -75,6 +76,7 @@ interface ItineraryBuilderProps {
   onBack: () => void
   onSave?: () => Promise<void>
   extraActions?: React.ReactNode
+  onHasChangesChange?: (hasChanges: boolean) => void
 }
 
 const EMPTY_DAY: IItineraryDay = {
@@ -176,7 +178,8 @@ const COMPONENT_TEMPLATES = [
   },
 ]
 
-export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions }: ItineraryBuilderProps) {
+export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
+  ({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions, onHasChangesChange }, ref) => {
   // library items disabled in this builder
   const { createItinerary, updateItinerary } = useItineraries()
   const { toast } = useToast()
@@ -285,6 +288,32 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
 
   const [viewMode, setViewMode] = useState<'itinerary' | 'all-inclusions'>('itinerary')
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // Markup state
+  const [markupType, setMarkupType] = useState<"percentage" | "amount">("amount")
+  const [markupValue, setMarkupValue] = useState<number>(0)
+  const [markupDialogOpen, setMarkupDialogOpen] = useState(false)
+
+  useImperativeHandle(ref, () => ({
+    save: handleSave,
+    handleBackWithCheck,
+    hasChanges
+  }))
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const isInitialLoad = useRef(true)
+
+  // Browser-level navigation guard
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault()
+        e.returnValue = ""
+      }
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+  }, [hasChanges])
 
   // Load existing itinerary data when editing
   useEffect(() => {
@@ -306,6 +335,8 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
             setDays(itineraryData.days || [{ ...EMPTY_DAY, events: [] }])
             setCountries(itineraryData.countries || [])
             setGallery(itineraryData.gallery || [])
+            setMarkupType(itineraryData.markupType || "amount")
+            setMarkupValue(itineraryData.markupValue || 0)
             if (itineraryData.branding && Object.keys(itineraryData.branding).length > 0) {
               setBranding(itineraryData.branding)
             } else {
@@ -333,11 +364,19 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
             setAgencyDetails(itineraryData.agencyDetails || {})
 
             console.log("[v0] Loaded itinerary data for editing:", itineraryData)
+            
+            // Mark initial load as done after data is set
+            setTimeout(() => {
+              isInitialLoad.current = false
+              setHasChanges(false)
+            }, 500)
           } else {
             console.error("[v0] Failed to load itinerary data:", response.statusText)
+            isInitialLoad.current = false
           }
         } catch (error) {
           console.error("[v0] Error loading itinerary data:", error)
+          isInitialLoad.current = false
         }
       } else if (isNewMode) {
         // Initialize with setup data from URL parameters for new itineraries
@@ -375,11 +414,56 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
         // Remove the query parameters
         router.replace('/itinerary/builder')
         setCurrentItineraryId(null)
+        
+        // Mark initial load as done
+        setTimeout(() => {
+          isInitialLoad.current = false
+          setHasChanges(false)
+        }, 500)
+      } else {
+        isInitialLoad.current = false
       }
     }
 
     loadItineraryData()
   }, [itineraryId, isNewMode, router, productId])
+
+  // Monitor state changes to set hasChanges
+  useEffect(() => {
+    // Skip setting hasChanges if it's initial load
+    if (isInitialLoad.current) return
+
+    // Skip setting hasChanges if it's already true to avoid unnecessary updates
+    if (!hasChanges) {
+      setHasChanges(true)
+    }
+  }, [title, description, days, countries, gallery, branding, serviceSlots, overviewEvents, productReferenceCode])
+
+  useEffect(() => {
+    if (onHasChangesChange) {
+      onHasChangesChange(hasChanges)
+    }
+  }, [hasChanges, onHasChangesChange])
+
+  const handleBackWithCheck = () => {
+    if (hasChanges) {
+      setShowExitConfirm(true)
+    } else {
+      onBack()
+    }
+  }
+
+  const handleConfirmExit = (saveFirst: boolean) => {
+    setShowExitConfirm(false)
+    if (saveFirst) {
+      handleSave().then(() => {
+        onBack()
+      })
+    } else {
+      setHasChanges(false) // Reset to avoid double prompt
+      onBack()
+    }
+  }
 
   // Load quotation data if in quotation mode
   useEffect(() => {
@@ -822,14 +906,22 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
       return;
     }
 
+    let finalEvent = {
+      ...updatedEvent,
+      highlights: updatedEvent.highlights ? [...updatedEvent.highlights] : [],
+      listItems: updatedEvent.listItems ? [...updatedEvent.listItems] : [],
+    }
+
+    if (finalEvent.componentSource === "my-library") {
+      finalEvent.componentSource = "my-library-edited"
+    } else if (finalEvent.componentSource === "global-library") {
+      finalEvent.componentSource = "global-library-edited"
+    }
+
     // Handle overview events (dayIndex === -2)
     if (editingEvent.dayIndex === -2) {
       const newOverviewEvents = [...overviewEvents]
-      newOverviewEvents[editingEvent.eventIndex] = {
-        ...updatedEvent,
-        highlights: updatedEvent.highlights ? [...updatedEvent.highlights] : [],
-        listItems: updatedEvent.listItems ? [...updatedEvent.listItems] : [],
-      }
+      newOverviewEvents[editingEvent.eventIndex] = finalEvent
       setOverviewEvents(newOverviewEvents)
       setEditingEvent(null)
       return
@@ -843,12 +935,12 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
       if (newSlots[slotIndex]) {
         // Update the event inside the slot
         newSlots[slotIndex].events[0] = {
-          ...updatedEvent,
+          ...finalEvent,
           // Ensure category stays 'list' or correct type
-          category: updatedEvent.category || newSlots[slotIndex].events[0].category
+          category: finalEvent.category || newSlots[slotIndex].events[0].category
         }
         // Also update slot title if needed
-        newSlots[slotIndex].title = updatedEvent.title
+        newSlots[slotIndex].title = finalEvent.title
 
         setServiceSlots(newSlots)
         setEditingEvent(null)
@@ -860,11 +952,7 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
     let newDays = JSON.parse(JSON.stringify(days))
 
     // 2. Update the event at the specific position
-    newDays[editingEvent.dayIndex].events[editingEvent.eventIndex] = {
-      ...updatedEvent,
-      highlights: updatedEvent.highlights ? [...updatedEvent.highlights] : [],
-      listItems: updatedEvent.listItems ? [...updatedEvent.listItems] : [],
-    }
+    newDays[editingEvent.dayIndex].events[editingEvent.eventIndex] = finalEvent
 
     // 3. Handle multi-night hotels
     // 3. Handle multi-night hotels
@@ -1398,10 +1486,17 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
   const handlePreviewConfirm = async (config: PreviewConfig) => {
     setIsGeneratingPreview(true)
     try {
-      const totalPrice = days.reduce(
+      const basePrice = days.reduce(
         (sum, day) => sum + day.events.reduce((daySum, event) => daySum + (event.price || 0), 0),
         0,
       )
+
+      let totalPrice = basePrice
+      if (markupType === "percentage") {
+        totalPrice = basePrice + (basePrice * markupValue / 100)
+      } else {
+        totalPrice = basePrice + markupValue
+      }
 
       const totalNights = days.reduce((sum, day) => sum + (day.nights || 0), 0)
 
@@ -1439,6 +1534,8 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
         nights: totalNights,
         branding: effectiveBranding,
         totalPrice,
+        markupType,
+        markupValue,
         generatedAt: formatDate(new Date()),
         serviceSlots,
         gallery,
@@ -1446,6 +1543,7 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
         itineraryId: effectiveItineraryId ? effectiveItineraryId.toString() : null,
         _id: effectiveItineraryId ? effectiveItineraryId.toString() : undefined,
         itineraryType: itineraryTypeParam,
+        currency: pricingCurrency,
       }
 
       localStorage.setItem("itinerary-preview", JSON.stringify(previewData))
@@ -1500,12 +1598,17 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
     setCountryError("")
 
     try {
-      const totalPrice = useManualTotal && manualTotalPrice
-        ? Number(manualTotalPrice)
-        : days.reduce(
-          (sum, day) => sum + day.events.reduce((daySum, event) => daySum + (event.price || 0), 0),
-          0,
-        )
+      const basePrice = days.reduce(
+        (sum, day) => sum + day.events.reduce((daySum, event) => daySum + (event.price || 0), 0),
+        0,
+      )
+
+      let totalPrice = basePrice
+      if (markupType === "percentage") {
+        totalPrice = basePrice + (basePrice * markupValue / 100)
+      } else {
+        totalPrice = basePrice + markupValue
+      }
 
       const itineraryData = {
         productId: productId.trim() || ("ITN-" + Date.now().toString(36).toUpperCase()),
@@ -1516,6 +1619,8 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
         duration: days.length + (days.length === 1 ? " day" : " days"),
         totalPrice,
         currency: pricingCurrency,
+        markupType,
+        markupValue,
         createdBy: "agent-user",
         countries,
         days: days.map((day, dayIdx) => {
@@ -1627,6 +1732,8 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
             days: days
           })
         }
+        // Reset changes tracking after successful save
+        setHasChanges(false)
       }
     } catch (error) {
       console.error("[v0] Save error:", error)
@@ -1866,7 +1973,22 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
       )}
       <div className="flex-1 p-3 overflow-y-auto h-full">
         {/* Header Card */}
-        <div className="bg-white rounded-xl shadow-sm border mb-4 p-3 flex flex-col gap-0">
+        <div className="bg-white rounded-xl shadow-sm border mb-4 p-3 flex flex-col gap-0 relative">
+          <div className="absolute top-3 right-3 flex items-center gap-2">
+            {hasChanges && (
+              <Badge variant="outline" className="text-orange-500 border-orange-200 bg-orange-50 mr-2">
+                Unsaved Changes
+              </Badge>
+            )}
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving}
+              className="bg-[#2D7CEA] hover:bg-[#1e63c7] text-white shadow-md"
+            >
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Changes
+            </Button>
+          </div>
           {/* Itinerary Title - Biggest Font Size */}
           <div className="flex items-center">
             <input
@@ -2568,66 +2690,153 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
 
         {/* Pricing Display Section */}
         {pricingEnabled && (
-          <div className="mt-6 mb-2 p-4 rounded-lg border bg-yellow-50 border-yellow-200">
-            {/* Toggle: Auto Calculate vs Manual */}
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <span className={`text-sm font-medium ${!useManualTotal ? 'text-green-700' : 'text-gray-400'}`}>Auto Calculate</span>
-              <Switch
-                checked={useManualTotal}
-                onCheckedChange={(v) => {
-                  setUseManualTotal(Boolean(v))
-                  if (!v) setManualTotalPrice("")
-                }}
-              />
-              <span className={`text-sm font-medium ${useManualTotal ? 'text-green-700' : 'text-gray-400'}`}>Manual Entry</span>
-            </div>
+          <div className="mt-6 mb-2 p-6 rounded-xl border-2 bg-yellow-50/50 border-yellow-200 shadow-sm relative overflow-hidden">
+            {/* Auto Calculated Price Only */}
+            {(() => {
+              const pricingConfig: PricingConfig = {
+                adults: pricingAdults,
+                children: pricingChildren,
+                targetCurrency: pricingCurrency,
+                rooms: pricingRooms,
+              }
+              const allEvents = days.flatMap(day => day.events)
+              const { total: basePrice } = calculateTotalPrice(allEvents, pricingConfig)
 
-            {useManualTotal ? (
-              /* Manual Price Entry */
-              <div className="text-center">
-                <div className="text-lg font-bold text-gray-800 mb-2">Total Price (Manual)</div>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-xl font-bold text-gray-600">
-                    {pricingCurrency === 'INR' ? '₹' : pricingCurrency === 'USD' ? '$' : pricingCurrency === 'EUR' ? '€' : pricingCurrency === 'GBP' ? '£' : pricingCurrency === 'AED' ? 'د.إ' : ''}
-                  </span>
-                  <input
-                    type="number"
-                    value={manualTotalPrice}
-                    onChange={(e) => setManualTotalPrice(e.target.value)}
-                    placeholder="Enter total price"
-                    className="w-48 text-center text-2xl font-extrabold text-green-700 border-b-2 border-green-300 bg-transparent outline-none focus:border-green-600 placeholder:text-gray-300 placeholder:text-lg placeholder:font-normal [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                {manualTotalPrice && (
-                  <div className="text-2xl font-extrabold text-green-700 mt-2">
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: pricingCurrency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Number(manualTotalPrice))}
+              let finalTotal = basePrice
+              if (markupType === "percentage") {
+                finalTotal = basePrice + (basePrice * markupValue / 100)
+              } else {
+                finalTotal = basePrice + markupValue
+              }
+
+              const displayTotal = new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: pricingCurrency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              }).format(finalTotal)
+
+              return (
+                <div className="flex flex-col items-center justify-center">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="text-gray-500 text-xs font-bold uppercase tracking-[0.2em]">Total Amount</span>
+                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 text-[10px] font-black uppercase h-5 px-2">
+                      Final Quote
+                    </Badge>
                   </div>
-                )}
-              </div>
-            ) : (
-              /* Auto Calculated Price */
-              (() => {
-                const pricingConfig: PricingConfig = {
-                  adults: pricingAdults,
-                  children: pricingChildren,
-                  targetCurrency: pricingCurrency,
-                  rooms: pricingRooms,
-                }
-                const allEvents = days.flatMap(day => day.events)
-                const { total, displayTotal, breakdown } = calculateTotalPrice(allEvents, pricingConfig)
-
-                return (
-                  <div className="text-center">
-                    <div className="text-lg font-bold text-gray-800">Total Price</div>
-                    <div className="text-2xl font-extrabold text-green-700 mt-1">
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="text-5xl font-black text-green-700 tracking-tight">
                       {displayTotal}
                     </div>
+                    
+                    <Button 
+                      onClick={() => setMarkupDialogOpen(true)}
+                      variant="outline" 
+                      size="sm" 
+                      className="bg-white hover:bg-yellow-100 border-yellow-300 text-yellow-700 font-bold h-10 px-4 rounded-lg shadow-sm"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Markup
+                    </Button>
                   </div>
-                )
-              })()
-            )}
+
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="text-[11px] text-gray-500 font-medium italic">
+                      Includes auto-calculated components
+                      {markupValue > 0 && (
+                        <span className="text-yellow-600 font-bold ml-1">
+                          + {markupType === 'percentage' ? `${markupValue}%` : `${pricingCurrency} ${markupValue}`} markup
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
+
+        {/* Markup Dialog */}
+        <Dialog open={markupDialogOpen} onOpenChange={setMarkupDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Itinerary Markup Settings</DialogTitle>
+              <DialogDescription>
+                Apply a markup to the total calculated price. This will update the final total shown to the client.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="flex flex-col gap-2">
+                <Label>Markup Type</Label>
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                  <button
+                    onClick={() => setMarkupType("percentage")}
+                    className={cn(
+                      "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                      markupType === "percentage" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    Percentage (%)
+                  </button>
+                  <button
+                    onClick={() => setMarkupType("amount")}
+                    className={cn(
+                      "flex-1 py-2 text-sm font-bold rounded-md transition-all",
+                      markupType === "amount" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    Fixed Amount ({pricingCurrency})
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="markup-value">
+                  Markup {markupType === "percentage" ? "Percentage" : "Value"}
+                </Label>
+                <div className="relative">
+                  {markupType === "amount" && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                      {pricingCurrency}
+                    </span>
+                  )}
+                  <Input
+                    id="markup-value"
+                    type="number"
+                    value={markupValue || ""}
+                    onChange={(e) => setMarkupValue(Number(e.target.value))}
+                    className={cn("text-lg font-bold", markupType === "amount" && "pl-12")}
+                    placeholder={markupType === "percentage" ? "e.g. 15" : "e.g. 5000"}
+                  />
+                  {markupType === "percentage" && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                      %
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setMarkupValue(0)
+                  setMarkupType("amount")
+                  setMarkupDialogOpen(false)
+                }}
+                className="font-bold text-gray-500"
+              >
+                Reset Markup
+              </Button>
+              <Button 
+                onClick={() => setMarkupDialogOpen(false)}
+                className="bg-[#2D7CEA] hover:bg-[#1e63c7] text-white font-bold"
+              >
+                Apply Markup
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Action Buttons Section */}
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -2815,7 +3024,26 @@ export function ItineraryBuilder({ itineraryId, quotationId, mode = "itinerary",
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showExitConfirm} onOpenChange={setShowExitConfirm}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Unsaved Changes</DialogTitle>
+            <DialogDescription>
+              You have unsaved changes. Do you want to save before leaving?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => handleConfirmExit(false)} className="sm:flex-1">
+              Discard
+            </Button>
+            <Button onClick={() => handleConfirmExit(true)} className="sm:flex-1 bg-[#2D7CEA] hover:bg-[#1e63c7]">
+              Save & Exit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div >
   )
-}
+})
 

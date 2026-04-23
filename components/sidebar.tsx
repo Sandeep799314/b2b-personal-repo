@@ -91,7 +91,19 @@ export function Sidebar({ activeView, collapsed, setCollapsed }: SidebarProps) {
                       isActive ? "bg-yellow-100 text-yellow-800 font-medium" : "text-gray-600",
                     )}
                     onClick={() => {
-                      router.push(`/${item.id}`)
+                      const targetUrl = `/${item.id}`
+                      
+                      // Check for unsaved changes in itinerary builder
+                      if (typeof window !== 'undefined' && (window as any).itineraryBuilderHasChanges) {
+                        const event = new CustomEvent("itinerary-navigation-attempt", {
+                          detail: { url: targetUrl },
+                          cancelable: true
+                        })
+                        window.dispatchEvent(event)
+                        return // Let the builder handle the navigation
+                      }
+                      
+                      router.push(targetUrl)
                     }}
                     title={collapsed ? item.label : undefined}
                   >

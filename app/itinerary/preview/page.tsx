@@ -73,7 +73,9 @@ interface PreviewItinerary {
   }
 
   totalPrice: number
-
+  currency?: string
+  markupType?: "percentage" | "amount"
+  markupValue?: number
   generatedAt: string
 
   additionalSections: Record<string, string>

@@ -134,11 +134,11 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 	if (!isOpen) return null
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4">
+		<div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16 sm:pt-20 pb-6">
 			<div className="fixed inset-0 bg-black/50" onClick={onClose} />
-			<div className="relative w-full max-w-[600px]">
-				<div className="bg-white rounded-lg shadow-lg overflow-hidden">
-					<div className="py-4 px-6">
+			<div className="relative w-full max-w-[600px] max-h-full flex flex-col">
+				<div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+					<div className="py-4 px-6 border-b">
 						<h2 className="text-lg font-semibold">Create New Itinerary</h2>
 					</div>
 
@@ -161,7 +161,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 						</Button>
 					</div>
 				) : setupType === "new" ? (
-					<div className="space-y-6 p-4 max-h-[600px] overflow-y-auto">
+					<div className="space-y-6 p-4 overflow-y-auto max-h-[calc(100vh-180px)]">
 						<div>
 							<Label className="text-base font-medium mb-3 block">Select Itinerary Type</Label>
 							<div className="grid grid-cols-2 gap-3">

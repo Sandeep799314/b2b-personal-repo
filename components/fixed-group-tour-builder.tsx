@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,9 +27,10 @@ import { getAuthHeaders } from "@/lib/client-auth"
 interface FixedGroupTourBuilderProps {
   itineraryId?: string
   onBack: () => void
+  onHasChangesChange?: (hasChanges: boolean) => void
 }
 
-export function FixedGroupTourBuilder({ itineraryId, onBack }: FixedGroupTourBuilderProps) {
+export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange }: FixedGroupTourBuilderProps) {
   const { toast } = useToast()
   const [title, setTitle] = useState("New Fixed Group Tour")
   const [description, setDescription] = useState("")
@@ -51,15 +52,40 @@ export function FixedGroupTourBuilder({ itineraryId, onBack }: FixedGroupTourBui
 
   // Gallery state
   const [gallery, setGallery] = useState<IGalleryItem[]>([])
+  const [hasChanges, setHasChanges] = useState(false)
+  const isInitialLoad = useRef(true)
 
   // Load existing data if editing
   useEffect(() => {
     if (itineraryId) {
-      loadTourData()
+      loadTourData().then(() => {
+        setTimeout(() => {
+          isInitialLoad.current = false
+          setHasChanges(false)
+        }, 500)
+      })
     } else {
       initializeFromParams()
+      setTimeout(() => {
+        isInitialLoad.current = false
+        setHasChanges(false)
+      }, 500)
     }
   }, [itineraryId])
+
+  // Track changes
+  useEffect(() => {
+    if (isInitialLoad.current) return
+    if (!hasChanges) {
+      setHasChanges(true)
+    }
+  }, [title, description, destination, duration, startDate, endDate, maxParticipants, currentBookings, availableDates, basePrice, gallery])
+
+  useEffect(() => {
+    if (onHasChangesChange) {
+      onHasChangesChange(hasChanges)
+    }
+  }, [hasChanges, onHasChangesChange])
 
   const loadTourData = async () => {
     try {
