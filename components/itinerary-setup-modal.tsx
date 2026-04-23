@@ -51,6 +51,40 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 	const [itineraryType, setItineraryType] = useState<ItineraryType>("customized-package")
 	const [formData, setFormData] = useState({ ...INITIAL_FORM_STATE })
 	const [isChecking, setIsChecking] = useState(false)
+	const [titleError, setTitleError] = useState<string | null>(null)
+
+	// Check for duplicate title whenever name changes
+	useEffect(() => {
+		const checkTitle = async () => {
+			const name = formData.name.trim()
+			if (name.length < 3) {
+				setTitleError(null)
+				return
+			}
+
+			try {
+				const authHeaders = await getAuthHeaders()
+				const res = await fetch(`/api/itineraries?title=${encodeURIComponent(name)}`, {
+					headers: authHeaders
+				})
+
+				if (res.ok) {
+					const result = await res.json()
+					const existing = result.data || []
+					if (existing.length > 0) {
+						setTitleError("An itinerary with this name already exists.")
+					} else {
+						setTitleError(null)
+					}
+				}
+			} catch (error) {
+				console.error("Error checking duplicate title:", error)
+			}
+		}
+
+		const timeoutId = setTimeout(checkTitle, 500)
+		return () => clearTimeout(timeoutId)
+	}, [formData.name])
 
 	const handleInputChange = (field: string, value: string) => {
 		setFormData(prev => ({ ...prev, [field]: value }))
@@ -77,6 +111,10 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			return
 		}
 
+		if (titleError) {
+			return // Don't proceed if there's a title error
+		}
+
 		if (itineraryType === "fixed-group-tour" && (!formData.startDate || !formData.endDate)) {
 			toast({
 				title: "Dates Missing",
@@ -95,7 +133,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			return
 		}
 
-		// Check for duplicate title
+		// Final check for duplicate title just in case
 		setIsChecking(true)
 		try {
 			const authHeaders = await getAuthHeaders()
@@ -108,11 +146,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 				const existing = result.data || []
 
 				if (existing.length > 0) {
-					toast({
-						title: "Itinerary Already Exists",
-						description: `You already have an itinerary named "${formData.name}". Please use a different name.`,
-						variant: "destructive"
-					})
+					setTitleError("An itinerary with this name already exists.")
 					setIsChecking(false)
 					return
 				}
@@ -172,6 +206,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			setSetupType(null)
 			setItineraryType("customized-package")
 			setFormData({ ...INITIAL_FORM_STATE })
+			setTitleError(null)
 		}
 	}, [isOpen])
 
@@ -261,12 +296,19 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 
 						<div className="space-y-4">
 							<div>
-								<Label>Itinerary Name *</Label>
+								<Label className={titleError ? "text-red-500 font-semibold" : ""}>Itinerary Name *</Label>
 								<Input
 									value={formData.name}
 									onChange={(e) => handleInputChange("name", e.target.value)}
 									placeholder="Enter itinerary name"
+									className={titleError ? "border-red-500 focus-visible:ring-red-500 bg-red-50/30" : ""}
 								/>
+								{titleError && (
+									<p className="text-red-500 text-xs mt-1.5 font-semibold flex items-center gap-1">
+										<span className="w-1 h-1 bg-red-500 rounded-full" />
+										{titleError}
+									</p>
+								)}
 							</div>
 
 							<div>
@@ -369,7 +411,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 							<Button variant="outline" onClick={() => setSetupType(null)}>
 								Back
 							</Button>
-							<Button onClick={handleCreateNew} disabled={isChecking}>
+							<Button onClick={handleCreateNew} disabled={isChecking || !!titleError}>
 								{isChecking ? (
 									<>
 										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
