@@ -505,7 +505,7 @@ export function LibraryView() {
               </div>
 
               {/* Library Items Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                 {loading ? (
                   <div className="col-span-full text-center py-12">
                     <p className="text-sm text-gray-500">Loading library items...</p>
@@ -517,48 +517,56 @@ export function LibraryView() {
                   </div>
                 ) : (
                   filteredItems.map((item) => (
-                    <Card key={item.id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="relative mb-3">
+                    <Card key={item.id} className="bg-white shadow-sm hover:shadow-md transition-all border-neutral-200 group overflow-hidden">
+                      <CardContent className="p-0">
+                        <div className="relative">
                           {item.multimedia && item.multimedia.length > 0 ? (
                             <img
                               src={item.multimedia[0]}
                               alt={item.title}
-                              className="w-full h-32 object-cover rounded-lg"
+                              className="w-full h-28 object-cover transition-transform duration-500 group-hover:scale-105"
                             />
                           ) : (
-                            <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-gray-300">
                               {getIcon(item.type)}
                             </div>
                           )}
-                          <div className="absolute top-2 right-2 flex space-x-1">
+                          <div className="absolute top-1.5 right-1.5 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               onClick={() => handleEditItem(dbItems.find(dbItem => dbItem._id === item.id))}
-                              className="bg-white/80 hover:bg-white text-gray-700 p-1 rounded"
+                              className="bg-white/90 hover:bg-white text-gray-700 h-6 w-6 p-0 rounded-md shadow-sm"
                               size="sm"
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
                             <Button
                               onClick={() => setDeleteConfirmationId(item.id)}
-                              className="bg-white/80 hover:bg-white text-red-600 p-1 rounded hover:bg-red-50"
+                              className="bg-white/90 hover:bg-white text-red-600 h-6 w-6 p-0 rounded-md shadow-sm"
                               size="sm"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
+                          <div className="absolute bottom-1.5 left-1.5">
+                            <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wider">
+                              {item.type}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 text-sm mb-1 truncate">{item.title}</h3>
+                        <div className="p-2.5">
+                          <h3 className="font-semibold text-gray-900 text-xs mb-0.5 truncate" title={item.title}>{item.title}</h3>
                           {item.location && (
-                            <p className="text-xs text-gray-500 mb-2">{item.location}</p>
+                            <p className="text-[10px] text-gray-500 mb-1.5 flex items-center">
+                              <MapPin className="h-2.5 w-2.5 mr-0.5 shrink-0" />
+                              <span className="truncate">{item.location}</span>
+                            </p>
                           )}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">
+                          <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-50">
+                            <span className="text-[9px] text-gray-400 font-medium">
                               {format(new Date(item.date), 'MMM dd, yyyy')}
                             </span>
                             {item.multimedia && item.multimedia.length > 1 && (
-                              <span className="text-xs text-gray-400">+{item.multimedia.length - 1} more</span>
+                              <span className="text-[9px] bg-gray-100 text-gray-600 px-1 rounded">+{item.multimedia.length - 1}</span>
                             )}
                           </div>
                         </div>

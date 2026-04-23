@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Copy, Calendar, Package, ShoppingCart, FileText, Clock } from "lucide-react"
+import { Plus, Copy, Calendar, Package, ShoppingCart, FileText, Clock, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { getAuthHeaders } from "@/lib/client-auth"
 
 export type ItineraryType = "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor"
 
@@ -44,9 +46,11 @@ const INITIAL_FORM_STATE = {
 
 export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: ItinerarySetupModalProps) {
 	const router = useRouter()
+	const { toast } = useToast()
 	const [setupType, setSetupType] = useState<"new" | "copy" | null>(null)
 	const [itineraryType, setItineraryType] = useState<ItineraryType>("customized-package")
 	const [formData, setFormData] = useState({ ...INITIAL_FORM_STATE })
+	const [isChecking, setIsChecking] = useState(false)
 
 	const handleInputChange = (field: string, value: string) => {
 		setFormData(prev => ({ ...prev, [field]: value }))
@@ -63,20 +67,58 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 		return `${prefix}-${Date.now().toString(36).toUpperCase()}`
 	}
 
-	const handleCreateNew = () => {
+	const handleCreateNew = async () => {
 		if (!formData.name || !formData.productId) {
-			alert("Please fill in required fields")
+			toast({
+				title: "Required Fields Missing",
+				description: "Please enter itinerary name and product ID",
+				variant: "destructive"
+			})
 			return
 		}
 
 		if (itineraryType === "fixed-group-tour" && (!formData.startDate || !formData.endDate)) {
-			alert("Please specify start and end dates for Fixed Group Tour")
+			toast({
+				title: "Dates Missing",
+				description: "Please specify start and end dates for Fixed Group Tour",
+				variant: "destructive"
+			})
 			return
 		}
 
 		if ((itineraryType === "customized-package" || itineraryType === "html-editor") && !formData.days) {
-			alert("Please specify number of days")
+			toast({
+				title: "Duration Missing",
+				description: "Please specify number of days",
+				variant: "destructive"
+			})
 			return
+		}
+
+		// Check for duplicate title
+		setIsChecking(true)
+		try {
+			const authHeaders = await getAuthHeaders()
+			const res = await fetch(`/api/itineraries?title=${encodeURIComponent(formData.name.trim())}`, {
+				headers: authHeaders
+			})
+
+			if (res.ok) {
+				const result = await res.json()
+				const existing = result.data || []
+
+				if (existing.length > 0) {
+					toast({
+						title: "Itinerary Already Exists",
+						description: `You already have an itinerary named "${formData.name}". Please use a different name.`,
+						variant: "destructive"
+					})
+					setIsChecking(false)
+					return
+				}
+			}
+		} catch (error) {
+			console.error("Error checking duplicate title:", error)
 		}
 
 		const parsedResult: ItinerarySetupResult = {
@@ -93,6 +135,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 		}
 
 		if (onCreate) {
+			setIsChecking(false)
 			onCreate(parsedResult)
 			return
 		}
@@ -112,6 +155,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 		})
 
 		router.push(`/itinerary/builder?${queryParams.toString()}`)
+		setIsChecking(false)
 		onClose()
 	}
 
@@ -325,8 +369,15 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 							<Button variant="outline" onClick={() => setSetupType(null)}>
 								Back
 							</Button>
-							<Button onClick={handleCreateNew}>
-								Create Itinerary
+							<Button onClick={handleCreateNew} disabled={isChecking}>
+								{isChecking ? (
+									<>
+										<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										Checking...
+									</>
+								) : (
+									"Create Itinerary"
+								)}
 							</Button>
 						</div>
 					</div>

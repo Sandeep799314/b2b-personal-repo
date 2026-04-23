@@ -266,7 +266,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredItineraries.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-300" />
@@ -292,10 +292,10 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
             return (
               <Card
                 key={itinerary._id}
-                className="hover:shadow-md transition-shadow h-full flex flex-col overflow-hidden group"
+                className="hover:shadow-md transition-shadow h-full flex flex-col overflow-hidden group border-neutral-200"
               >
                 {/* Preview Photo or Placeholder */}
-                <div className="h-48 w-full bg-gray-100 relative overflow-hidden shrink-0">
+                <div className="h-32 w-full bg-gray-100 relative overflow-hidden shrink-0">
                   {firstImage ? (
                     <img
                       src={firstImage.url}
@@ -304,40 +304,40 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                     />
                   ) : (
                     <div className={`w-full h-full flex items-center justify-center ${typeConfig.color} bg-opacity-20`}>
-                      <TypeIcon className="h-16 w-16 opacity-20" />
+                      <TypeIcon className="h-10 w-10 opacity-20" />
                     </div>
                   )}
                   {/* Overlay Badge */}
                   <div className="absolute top-2 right-2">
-                    <Badge className={`${typeConfig.color} shadow-sm border`}>
-                      <TypeIcon className="h-3 w-3 mr-1" />
+                    <Badge className={`${typeConfig.color} shadow-sm border text-[10px] px-1.5 py-0`}>
+                      <TypeIcon className="h-2.5 w-2.5 mr-1" />
                       {typeConfig.label}
                     </Badge>
                   </div>
                 </div>
 
-                <CardHeader className="pb-2">
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl line-clamp-1" title={itinerary.title}>
+                <CardHeader className="p-3 pb-0">
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-sm font-semibold line-clamp-1" title={itinerary.title}>
                       {itinerary.title}
                     </CardTitle>
-                    <CardDescription className="flex items-center text-sm text-gray-500">
-                      <MapPin className="mr-1 h-3 w-3 shrink-0" />
+                    <CardDescription className="flex items-center text-[11px] text-gray-500">
+                      <MapPin className="mr-1 h-2.5 w-2.5 shrink-0" />
                       <span className="line-clamp-1">{itinerary.destination || "Multiple Destinations"}</span>
                     </CardDescription>
                   </div>
                 </CardHeader>
 
-                <CardContent className="flex-1 flex flex-col pt-0">
-                  <div className="space-y-4 flex-1">
+                <CardContent className="flex-1 flex flex-col p-3 pt-2">
+                  <div className="space-y-2 flex-1">
                     {/* Duration and Price */}
-                    <div className="flex items-center justify-between text-sm pt-2">
-                      <div className="flex items-center text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
-                        <Clock className="mr-1.5 h-3.5 w-3.5" />
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                        <Clock className="mr-1 h-3 w-3" />
                         {itinerary.duration}
                       </div>
                       {itinerary.totalPrice > 0 && (
-                        <div className="flex items-center text-brand-700 font-semibold bg-brand-50 px-2 py-1 rounded-md">
+                        <div className="flex items-center text-brand-700 font-bold bg-brand-50 px-1.5 py-0.5 rounded border border-brand-100">
                           {new Intl.NumberFormat('en-US', {
                             style: 'currency',
                             currency: itinerary.currency || 'USD',
@@ -349,58 +349,49 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                     </div>
 
                     {/* Description */}
-                    <p className="text-sm text-gray-600 line-clamp-2 min-h-[2.5rem]">
+                    <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
                       {itinerary.description || "No description available."}
                     </p>
 
-                    {/* Metadata Section (Type specific or generic) */}
-                    <div className="space-y-2 text-xs text-gray-500">
-                      {itinerary.productReferenceCode && (
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700">Ref:</span>
-                          <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded">{itinerary.productReferenceCode}</span>
-                        </div>
+                    {/* Metadata Section */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-auto text-[10px] text-gray-400">
+                      {itinerary.productReferenceCode ? (
+                        <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-[9px]">{itinerary.productReferenceCode}</span>
+                      ) : (
+                        <span></span>
                       )}
-
-                      {/* Last Edited Info */}
-                      <div className="flex items-center justify-between pt-2 border-t border-dashed mt-auto text-xs text-gray-400">
-                        <span>Last edited</span>
-                        <span>
-                          {new Date(itinerary.updatedAt).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: 'numeric',
-                            hour12: true
-                          })}
-                        </span>
-                      </div>
+                      <span>
+                        {new Date(itinerary.updatedAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </span>
                     </div>
                   </div>
 
                   {/* Actions Footer */}
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
                     {selectForQuotation ? (
                       <Button
                         variant="default"
                         size="sm"
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md hover:shadow-lg transition-all"
+                        className="w-full h-8 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium"
                         onClick={() => handleItinerarySelect(itinerary)}
                       >
-                        <FileDigit className="h-4 w-4 mr-2" />
-                        Select for Quotation
+                        <FileDigit className="h-3 w-3 mr-1.5" />
+                        Select
                       </Button>
                     ) : (
                       <>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-200"
+                          className="flex-1 h-7 text-[11px] hover:bg-brand-50"
                           onClick={() => onViewItinerary(itinerary._id!)}
                           disabled={isViewing}
                         >
                           {isViewing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-3 w-3 animate-spin" />
                           ) : (
                             "View"
                           )}
@@ -408,30 +399,29 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200"
+                          className="flex-1 h-7 text-[11px] hover:bg-blue-50"
                           onClick={() => onEditItinerary(itinerary._id!)}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
-                        <div className="flex gap-1 border-l pl-2 ml-1">
+                        <div className="flex gap-0.5 border-l border-gray-100 pl-1 ml-0.5">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 hover:text-brand-600 hover:bg-brand-50"
+                            className="h-7 w-7 text-gray-400 hover:text-brand-600"
                             onClick={() => createQuickShare(itinerary)}
                             title="Share"
                           >
-                            <Share2 className="h-4 w-4" />
+                            <Share2 className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-gray-500 hover:text-red-600 hover:bg-red-50"
+                            className="h-7 w-7 text-gray-400 hover:text-red-600"
                             onClick={() => handleDeleteClick(itinerary)}
                             title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </>

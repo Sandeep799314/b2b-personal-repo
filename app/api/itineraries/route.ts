@@ -211,6 +211,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check for duplicate title for this specific user
+    const existingItinerary = await Itinerary.findOne({
+      userId: user.uid,
+      title: { $regex: `^${data.title.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+      $or: [
+        { isQuotationOnly: { $ne: true } },
+        { isQuotationOnly: { $exists: false } },
+      ],
+    });
+
+    if (existingItinerary) {
+      return createErrorResponse(
+        "Duplicate Title",
+        `An itinerary with the name "${data.title}" already exists in your account. Please use a different name.`,
+        "DUPLICATE_TITLE_ERROR",
+        409,
+        {
+          duplicateField: "title",
+          duplicateValue: data.title,
+        },
+        requestId,
+      );
+    }
+
     const processedData = {
       ...data,
       // Inject user fields
