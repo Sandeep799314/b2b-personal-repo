@@ -93,8 +93,15 @@ export function calculateHotelPrice(
     config: PricingConfig,
     isCheckoutDay?: boolean
 ): PriceResult | null {
+    // Detect checkout day: either explicitly passed or hotelNightIndex > hotelTotalNights
+    const isActuallyCheckout = isCheckoutDay || (
+        event.hotelNightIndex !== undefined && 
+        event.hotelTotalNights !== undefined && 
+        event.hotelNightIndex > event.hotelTotalNights
+    );
+
     // Don't show price on checkout day
-    if (isCheckoutDay) {
+    if (isActuallyCheckout) {
         return null
     }
 
@@ -403,25 +410,31 @@ export function calculateTotalPrice(
 
     events.forEach(event => {
         // Special handling for multi-night hotels to avoid double counting
-        // Only calculate price on the first night (Check-in) and multiply by total nights
-        if (event.category === 'hotel' && event.hotelNightIndex) {
-            // Only proceed if it's the first night
-            if (event.hotelNightIndex === 1) {
-                const result = calculateComponentPrice(event, config)
-                if (result) {
-                    const totalNights = event.hotelTotalNights || event.nights || 1
-                    const totalStayPrice = result.calculatedPrice * totalNights
-                    const displayStayPrice = formatCurrencyWithSymbol(totalStayPrice, config.targetCurrency)
-
+        // We now count 1 night per event if it's an indexed night (part of a spread)
+        // This ensures both Day Totals and Itinerary Totals are correct
+        if (event.category === 'hotel') {
+            const result = calculateComponentPrice(event, config)
+            if (result) {
+                if (event.hotelNightIndex) {
+                    // Spread multi-night hotel case: each event instance represents ONE night
+                    total += result.calculatedPrice
+                    breakdown.push({
+                        title: event.title,
+                        price: result.calculatedPrice,
+                        displayPrice: result.displayPrice
+                    })
+                } else {
+                    // Standalone hotel event: multiply by nights
+                    const nights = event.nights || 1
+                    const totalStayPrice = result.calculatedPrice * nights
                     total += totalStayPrice
                     breakdown.push({
-                        title: event.title, // Keep original title
+                        title: event.title,
                         price: totalStayPrice,
-                        displayPrice: displayStayPrice
+                        displayPrice: formatCurrencyWithSymbol(totalStayPrice, config.targetCurrency)
                     })
                 }
             }
-            // Skip all other nights (index > 1) to prevent duplicate pricing
             return
         }
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { getDefaultImageByIndex } from "@/lib/constants"
 
 interface AgentDashboardProps {
   onViewItinerary: (id: string) => void
@@ -44,7 +45,7 @@ export function AgentDashboard({ onViewItinerary }: AgentDashboardProps) {
       discount: "20% OFF",
       rating: 4.8,
       reviews: 124,
-      image: "/placeholder.svg?height=200&width=300",
+      image: getDefaultImageByIndex(0),
       trending: true,
     },
     {
@@ -54,7 +55,7 @@ export function AgentDashboard({ onViewItinerary }: AgentDashboardProps) {
       price: "$2,899",
       rating: 4.9,
       reviews: 89,
-      image: "/placeholder.svg?height=200&width=300",
+      image: getDefaultImageByIndex(1),
       trending: false,
     },
     {
@@ -66,7 +67,7 @@ export function AgentDashboard({ onViewItinerary }: AgentDashboardProps) {
       discount: "15% OFF",
       rating: 4.7,
       reviews: 156,
-      image: "/placeholder.svg?height=200&width=300",
+      image: getDefaultImageByIndex(2),
       trending: true,
     },
   ]
@@ -172,51 +173,73 @@ export function AgentDashboard({ onViewItinerary }: AgentDashboardProps) {
             View All
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {recommendedTrips.map((trip) => (
             <Card
               key={trip.id}
-              className="card-elevated overflow-hidden cursor-pointer hover:shadow-brand-lg transition-all duration-200 group"
+              className="group overflow-hidden border-neutral-200 hover:border-brand-primary-200 hover:shadow-xl transition-all duration-300 flex flex-col"
             >
-              <div className="relative overflow-hidden">
+              <div className="relative h-56 overflow-hidden">
                 <img
                   src={trip.image || "/placeholder.svg"}
                   alt={trip.title}
-                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                 />
-                <div className="absolute top-3 left-3 flex gap-2">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                <div className="absolute top-4 left-4 flex flex-col gap-2">
                   {trip.discount && (
-                    <Badge className="bg-brand-secondary-500 text-white font-semibold">{trip.discount}</Badge>
+                    <Badge className="bg-brand-secondary-500 text-white font-bold px-2 py-1 border-none shadow-sm">
+                      {trip.discount}
+                    </Badge>
                   )}
                   {trip.trending && (
-                    <Badge className="bg-success-500 text-white font-semibold">
-                      <TrendingUp className="w-3 h-3 mr-1" />
+                    <Badge className="bg-emerald-500 text-white font-bold px-2 py-1 border-none shadow-sm">
+                      <TrendingUp className="w-3.5 h-3.5 mr-1" />
                       Trending
                     </Badge>
                   )}
                 </div>
-                <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center">
-                  <Star className="h-3 w-3 fill-warning-400 text-warning-400 mr-1" />
-                  <span className="text-xs font-medium text-neutral-900">{trip.rating}</span>
+                
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md rounded-full px-2.5 py-1.5 flex items-center shadow-sm border border-white/20">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 mr-1.5" />
+                  <span className="text-xs font-bold text-neutral-900">{trip.rating}</span>
                 </div>
               </div>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">{trip.title}</h3>
-                <p className="text-body-sm text-neutral-600 mb-4 flex items-center">
-                  <MapPin className="mr-1 h-3 w-3" />
+              
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <div className="flex items-center text-[11px] font-bold text-brand-primary-600 uppercase tracking-widest mb-2">
+                  <MapPin className="mr-1.5 h-3.5 w-3.5" />
                   {trip.destination}
-                </p>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-2">
-                    {trip.originalPrice && (
-                      <span className="text-body-sm text-neutral-400 line-through">{trip.originalPrice}</span>
-                    )}
-                    <span className="text-heading-lg text-brand-primary-600 font-bold">{trip.price}</span>
-                  </div>
-                  <div className="text-body-xs text-neutral-500">{trip.reviews} reviews</div>
                 </div>
-                <Button className="w-full btn-primary" onClick={() => onViewItinerary(trip.id)}>
-                  Learn More
+                
+                <h3 className="text-xl font-bold text-neutral-900 mb-3 group-hover:text-brand-primary-700 transition-colors line-clamp-1">
+                  {trip.title}
+                </h3>
+                
+                <div className="mt-auto pt-4 flex items-center justify-between border-t border-neutral-100">
+                  <div className="flex flex-col">
+                    {trip.originalPrice && (
+                      <span className="text-[10px] text-neutral-400 line-through font-medium mb-0.5">
+                        {trip.originalPrice}
+                      </span>
+                    )}
+                    <div className="flex items-baseline">
+                      <span className="text-2xl font-black text-brand-primary-600">{trip.price}</span>
+                      <span className="text-[10px] text-neutral-400 font-medium ml-1">/ person</span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-[11px] text-neutral-500 font-medium bg-neutral-50 px-2 py-1 rounded">
+                    {trip.reviews} reviews
+                  </div>
+                </div>
+                
+                <Button 
+                  className="w-full mt-6 bg-brand-primary-600 hover:bg-brand-primary-700 text-white font-bold shadow-md transition-all active:scale-[0.98] h-11"
+                  onClick={() => onViewItinerary(trip.id)}
+                >
+                  View Details
                 </Button>
               </CardContent>
             </Card>

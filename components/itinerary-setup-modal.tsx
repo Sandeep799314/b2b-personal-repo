@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Copy, Calendar, Package, ShoppingCart, FileText, Clock, Loader2 } from "lucide-react"
+import { Plus, Copy, Calendar, Package, ShoppingCart, FileText, Clock, Loader2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { getAuthHeaders } from "@/lib/client-auth"
@@ -217,8 +217,11 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			<div className="fixed inset-0 bg-black/50" onClick={onClose} />
 			<div className="relative w-full max-w-[600px] max-h-full flex flex-col">
 				<div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-					<div className="py-4 px-6 border-b">
+					<div className="py-4 px-6 border-b flex items-center justify-between">
 						<h2 className="text-lg font-semibold">Create New Itinerary</h2>
+						<Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
+							<X size={18} />
+						</Button>
 					</div>
 
 					{!setupType ? (

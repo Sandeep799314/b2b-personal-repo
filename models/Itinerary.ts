@@ -83,6 +83,13 @@ export interface IItinerary {
     email: string
     gst: string
   }
+  // NEW: Header/Footer Settings
+  headerFooter?: {
+    headerImage?: string
+    footerImage?: string
+    contactInfo?: string
+    showOnAllPages?: boolean
+  }
 }
 
 export interface IGalleryItem {
@@ -839,6 +846,13 @@ const ItinerarySchema = new mongoose.Schema(
       phone: String,
       email: String,
       gst: String,
+    },
+    // Header/Footer Settings
+    headerFooter: {
+      headerImage: String,
+      footerImage: String,
+      contactInfo: String,
+      showOnAllPages: { type: Boolean, default: true }
     },
   },
   {

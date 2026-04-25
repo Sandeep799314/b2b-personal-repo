@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronUp,
   ChevronLeft,
+  Moon,
   StickyNote,
   Trash2,
   Briefcase,
@@ -44,6 +45,7 @@ import {
   Phone,
   MessageCircle,
   Mail,
+  LayoutGrid,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EventCard } from "./event-card"
@@ -286,15 +288,16 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [guestDetails, setGuestDetails] = useState<any>({})
   const [agencyDetails, setAgencyDetails] = useState<any>({})
+  const [headerFooter, setHeaderFooter] = useState<any>({})
 
   const [viewMode, setViewMode] = useState<'itinerary' | 'all-inclusions'>('itinerary')
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
   // Markup state
   const [markupType, setMarkupType] = useState<"percentage" | "amount">("amount")
   const [markupValue, setMarkupValue] = useState<number>(0)
-  const [markupDialogOpen, setMarkupDialogOpen] = useState(false)
 
   useImperativeHandle(ref, () => ({
     save: handleSave,
@@ -320,9 +323,31 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   useEffect(() => {
     const loadItineraryData = async () => {
       if (itineraryId) {
+        // Skip if we already have this itinerary loaded (e.g. after a save)
+        if (currentItineraryId === itineraryId && !isInitialLoad.current) {
+          console.log("[DEBUG] Itinerary already loaded, skipping fetch:", itineraryId)
+          return
+        }
+
         setCurrentItineraryId(itineraryId)
         try {
           console.log("[DEBUG] Loading itinerary data for ID:", itineraryId)
+          
+          // Basic validation for MongoDB ObjectId format or shared IDs
+          if (itineraryId === "undefined" || itineraryId === "null" || !itineraryId) {
+            console.error("[v0] Invalid itinerary ID provided:", itineraryId)
+            if (!isInitialLoad.current) return; // Don't redirect if it's just a transient state
+            
+            toast({
+              title: "Error",
+              description: "Invalid itinerary ID. Redirecting...",
+              variant: "destructive",
+            })
+            isInitialLoad.current = false
+            setTimeout(() => router.push("/itinerary"), 2000)
+            return
+          }
+
           const response = await fetch(`/api/itineraries/${itineraryId}`)
           if (response.ok) {
             const itineraryData = await response.json()
@@ -333,11 +358,26 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             setDescription(itineraryData.description || "")
             setProductId(itineraryData.productId || "")
             setProductReferenceCode(itineraryData.productReferenceCode || "")
-            setDays(itineraryData.days || [{ ...EMPTY_DAY, events: [] }])
+            
+            // Handle meals format (array to object conversion for the builder UI)
+            const processedDays = (itineraryData.days || []).map((day: any) => {
+              const mealsObj = { breakfast: false, lunch: false, dinner: false }
+              if (Array.isArray(day.meals)) {
+                day.meals.forEach((m: string) => {
+                  if (m === 'breakfast') mealsObj.breakfast = true
+                  if (m === 'lunch') mealsObj.lunch = true
+                  if (m === 'dinner') mealsObj.dinner = true
+                })
+              }
+              return { ...day, meals: mealsObj }
+            })
+
+            setDays(processedDays.length > 0 ? processedDays : [{ ...EMPTY_DAY, events: [] }])
             setCountries(itineraryData.countries || [])
             setGallery(itineraryData.gallery || [])
             setMarkupType(itineraryData.markupType || "amount")
             setMarkupValue(itineraryData.markupValue || 0)
+            
             if (itineraryData.branding && Object.keys(itineraryData.branding).length > 0) {
               setBranding(itineraryData.branding)
             } else {
@@ -363,6 +403,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             setServiceSlots(itineraryData.serviceSlots || [])
             setGuestDetails(itineraryData.guestDetails || {})
             setAgencyDetails(itineraryData.agencyDetails || {})
+            setHeaderFooter(itineraryData.headerFooter || {})
 
             console.log("[v0] Loaded itinerary data for editing:", itineraryData)
             
@@ -372,12 +413,32 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               setHasChanges(false)
             }, 500)
           } else {
-            console.error("[v0] Failed to load itinerary data:", response.statusText)
-            isInitialLoad.current = false
+            const errorData = await response.json().catch(() => ({}))
+            console.error("[v0] Failed to load itinerary data:", response.statusText, errorData)
+            
+            // Only show error if it's the initial load or a real ID
+            if (isInitialLoad.current) {
+              toast({
+                title: "Loading Failed",
+                description: errorData.error || "Failed to load itinerary data. It might have been deleted.",
+                variant: "destructive",
+              })
+              isInitialLoad.current = false
+              if (response.status === 404) {
+                setTimeout(() => router.push("/itinerary"), 2000)
+              }
+            }
           }
         } catch (error) {
           console.error("[v0] Error loading itinerary data:", error)
-          isInitialLoad.current = false
+          if (isInitialLoad.current) {
+            toast({
+              title: "Error",
+              description: "An unexpected error occurred while loading the itinerary.",
+              variant: "destructive",
+            })
+            isInitialLoad.current = false
+          }
         }
       } else if (isNewMode) {
         // Initialize with setup data from URL parameters for new itineraries
@@ -1541,7 +1602,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         generatedAt: formatDate(new Date()),
         serviceSlots,
         gallery,
-        previewConfig: config,
+        previewConfig: {
+          ...config,
+          theme: config.template // Map template to theme for compatibility
+        },
         itineraryId: effectiveItineraryId ? effectiveItineraryId.toString() : null,
         _id: effectiveItineraryId ? effectiveItineraryId.toString() : undefined,
         itineraryType: itineraryTypeParam,
@@ -1667,6 +1731,9 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         branding,
         serviceSlots,
         overviewEvents, // Include overview events in save data
+        guestDetails,
+        agencyDetails,
+        headerFooter,
       }
 
       console.log("[v0] Saving itinerary data:", itineraryData)
@@ -1939,9 +2006,9 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }
 
   const extractHighlights = (): string[] => {
-    const allHighlights = days.flatMap((day) => day.events.flatMap((event) => event.highlights || []))
-
-    return [...new Set(allHighlights.filter((highlight) => highlight.trim()))]
+    const eventHighlights = days.flatMap((day) => day.events.flatMap((event) => event.highlights || []))
+    const allHighlights = [...highlightOptions, ...eventHighlights]
+    return [...new Set(allHighlights.filter((highlight) => highlight && highlight.trim()))]
   }
 
   const extractImages = (): string[] => {
@@ -1953,17 +2020,35 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }
 
   return (
-    <div className="flex h-screen relative">
-      {/* Vertical EDITOR MODE strip for customized-package */}
+    <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen relative overflow-x-hidden bg-[#f8fafc]">
+      {/* Mobile Sticky Header - ONLY visible on mobile */}
+      <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Editor Mode</span>
+          <h1 className="text-sm font-bold text-neutral-800 truncate max-w-[180px]">{title || "Untitled Itinerary"}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+           <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            size="sm"
+            className={`${showSaved ? 'bg-green-600' : 'bg-[#2D7CEA]'} text-white rounded-full px-4 h-8 text-xs font-bold shadow-lg shadow-blue-500/20`}
+          >
+            {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : showSaved ? <Check className="h-3 w-3 mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
+            {isSaving ? "..." : showSaved ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </div>
+      {/* Vertical EDITOR MODE strip for customized-package - Hidden on Mobile */}
       {(itineraryTypeParam === 'customized-package' && (isNewMode || currentItineraryId)) && (
         <div
-          className="w-7 flex-none flex items-center justify-center shadow-md relative z-40"
+          className="hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40"
           style={{
             background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
           }}
         >
           <span
-            className="text-white font-bold text-sm tracking-widest whitespace-nowrap uppercase sticky top-1/2 -translate-y-1/2"
+            className="text-white font-bold text-sm tracking-widest whitespace-nowrap uppercase lg:sticky lg:top-1/2 lg:-translate-y-1/2"
             style={{
               writingMode: 'vertical-rl',
               textOrientation: 'mixed',
@@ -1975,62 +2060,151 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </span>
         </div>
       )}
-      <div className="flex-1 p-4 overflow-y-auto h-full bg-[#f8fafc]">
-        {/* Professional Header Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 mb-6 p-6 relative overflow-hidden">
-          {/* Subtle Top Accent */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-600" />
-          
-          <div className="absolute top-6 right-6 flex items-center gap-3">
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving}
-              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
-            >
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : showSaved ? (
-                <Check className="mr-2 h-4 w-4" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
-            </Button>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-2">
-            {/* Left Column: Title & Main Info */}
-            <div className="lg:col-span-8 space-y-6">
+      {/* Floating Mobile Action Bar - ONLY visible on mobile */}
+      <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-2xl border border-white/10 ring-1 ring-black/5">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={addDay}
+          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+        >
+          <Plus className="h-5 w-5" />
+        </Button>
+        <div className="w-px h-6 bg-white/20 mx-1" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handlePreview}
+          disabled={isGeneratingPreview}
+          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+        >
+          {isGeneratingPreview ? <Loader2 className="h-5 w-5 animate-spin" /> : <Eye className="h-5 w-5" />}
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={() => setMobileSidebarOpen(true)}
+          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+        >
+          <LayoutGrid className="h-5 w-5" />
+        </Button>
+        <div className="w-px h-6 bg-white/20 mx-1" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleCreateCopy}
+          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+        >
+          <Copy className="h-5 w-5" />
+        </Button>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+        >
+          <Share2 className="h-5 w-5" />
+        </Button>
+      </div>
+
+      <div className="flex-1 p-2 lg:p-4 overflow-y-auto h-full bg-[#f8fafc] pb-24 lg:pb-4">
+        {/* Professional Header Card */}
+        <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-neutral-200 mb-4 lg:mb-6 p-4 lg:p-6 relative overflow-hidden">
+          {/* Subtle Top Accent */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-yellow-500" />
+
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 lg:gap-6 mb-4 lg:mb-8">
+            <div className="flex-1 space-y-3 lg:space-y-4">
               {/* Title Section */}
               <div className="group relative">
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Itinerary Title"
-                  className="w-full text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all"
+                  className="w-full text-xl lg:text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all"
                   style={{ fontWeight: 900 }}
                   aria-label="Itinerary title"
                   type="text"
                   spellCheck={false}
                 />
-                <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-blue-500 transition-colors" />
+                <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-amber-400 transition-colors" />
               </div>
 
               {/* Days & Nights Badge Bar */}
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider flex items-center border border-blue-100">
-                  <Calendar className="w-3.5 h-3.5 mr-2" />
-                  {days.length} Days &nbsp;•&nbsp; {days.length > 0 ? days.length - 1 : 0} Nights
+              <div className="flex flex-wrap items-center gap-2 lg:gap-3">
+                <div className="bg-amber-50 text-amber-700 px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full text-[10px] lg:text-xs font-bold uppercase tracking-wider flex items-center border border-amber-100 shadow-sm">
+                  <Sun className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1.5 text-amber-500" />
+                  {days.length} Days
+                  <span className="mx-2 text-amber-200">|</span>
+                  <Moon className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1.5 text-amber-600" />
+                  {days.length > 0 ? days.reduce((sum, d) => sum + (d.nights || 0), 0) || Math.max(0, days.length - 1) : 0} Nights
                 </div>
-                <div className="text-neutral-400 text-xs font-medium">
+                <div className="hidden sm:block text-neutral-400 text-[10px] lg:text-xs font-medium bg-white px-2 py-1 rounded-md border border-neutral-100">
                   {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden lg:flex items-center gap-3 shrink-0">
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
+              >
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : showSaved ? (
+                  <Check className="mr-2 h-4 w-4" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+            {/* Left Column: Main Info */}
+            <div className="lg:col-span-8 space-y-4 lg:space-y-6">
+              {/* Destination & Reference Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
+                <div className="bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+                  <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
+                    Destination <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-amber-500" />
+                    <Input
+                      value={countries[0] || ""}
+                      onChange={(e) => setCountries([e.target.value])}
+                      className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
+                      placeholder="Where to?"
+                      autoComplete="off"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+                  <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
+                    Product Reference
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-neutral-400" />
+                    <Input
+                      value={productReferenceCode}
+                      onChange={(e) => setProductReferenceCode(e.target.value)}
+                      placeholder="Optional Code"
+                      className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
+                      aria-label="Product Reference Code"
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Description Box */}
-              <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
-                <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-2 block">
-                  Itinerary Narrative <span className="text-red-500">*</span>
+              <div className="bg-neutral-50 rounded-xl p-3 lg:p-4 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+                <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 lg:mb-2 block">
+                  Itinerary Description <span className="text-red-500">*</span>
                 </label>
                 {(() => {
                   const lines = description ? description.split('\n').length : 1
@@ -2041,63 +2215,28 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Describe the journey experience..."
                       rows={rows}
-                      className="min-h-[60px] border-none resize-none p-0 text-base bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700"
+                      className="min-h-[50px] lg:min-h-[60px] border-none resize-none p-0 text-sm lg:text-base bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700"
                       aria-label="Itinerary description"
                     />
                   )
                 })()}
               </div>
-
-              {/* Destination & Reference Row */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
-                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
-                    Primary Destination <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-blue-500" />
-                    <Input
-                      value={countries[0] || ""}
-                      onChange={(e) => setCountries([e.target.value])}
-                      className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
-                      placeholder="Where to?"
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-neutral-50 rounded-xl p-3 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
-                  <label className="text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
-                    Product Reference
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-neutral-400" />
-                    <Input
-                      value={productReferenceCode}
-                      onChange={(e) => setProductReferenceCode(e.target.value)}
-                      placeholder="Optional Code"
-                      className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
-                      aria-label="Product Reference Code"
-                    />
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Right Column: Highlights & Tags */}
-            <div className="lg:col-span-4 flex flex-col h-full border-l border-neutral-100 lg:pl-8">
+            <div className="lg:col-span-4 flex flex-col h-full lg:border-l border-neutral-100 lg:pl-8">
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-neutral-800 flex items-center gap-2">
-                    <Sun className="w-4 h-4 text-amber-500" />
+                <div className="flex items-center justify-between mb-3 lg:mb-4">
+                  <h3 className="text-xs lg:text-sm font-bold text-neutral-800 flex items-center gap-2">
+                    <Sun className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-500" />
                     Trip Highlights
                   </h3>
-                  <Badge variant="secondary" className="text-[10px] bg-neutral-100 text-neutral-500 border-none">
+                  <Badge variant="secondary" className="text-[9px] lg:text-[10px] bg-neutral-100 text-neutral-500 border-none">
                     {highlightOptions.length} TOTAL
                   </Badge>
                 </div>
-                
-                <div className="flex flex-wrap gap-1.5 mb-6 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+
+                <div className="flex flex-wrap gap-1 lg:gap-1.5 mb-4 lg:mb-6 max-h-[120px] lg:max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
                   {highlightOptions.map((highlight) => {
                     const isActive = days.some(day =>
                       day.events.some(event => event.highlights?.includes(highlight))
@@ -2106,10 +2245,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       <Badge
                         key={highlight}
                         variant="outline"
-                        className={`cursor-pointer text-[11px] py-1 px-2.5 rounded-lg transition-all border shadow-sm ${
+                        className={`cursor-pointer text-[10px] lg:text-[11px] py-0.5 lg:py-1 px-2 lg:px-2.5 rounded-lg transition-all border shadow-sm ${
                           isActive
-                            ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'
-                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-blue-300 hover:bg-blue-50'
+                            ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600'
+                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-amber-300 hover:bg-amber-50'
                         }`}
                         onClick={() => toggleHighlight(highlight)}
                         role="button"
@@ -2127,7 +2266,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                   })}
                 </div>
 
-                <div className="mt-auto pt-4 border-t border-neutral-50">
+                <div className="mt-auto pt-3 lg:pt-4 border-t border-neutral-50">
                   <div className="relative group">
                     <Input
                       type="text"
@@ -2140,7 +2279,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                           addHighlight(newHighlight.trim())
                         }
                       }}
-                      className="w-full pr-12 h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-blue-300 rounded-xl text-sm"
+                      className="w-full pr-10 lg:pr-12 h-9 lg:h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-amber-300 rounded-lg lg:rounded-xl text-xs lg:text-sm"
                     />
                     <Button
                       size="sm"
@@ -2150,12 +2289,12 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                           addHighlight(newHighlight.trim())
                         }
                       }}
-                      className="absolute right-1.5 top-1.5 h-8 w-8 p-0 text-blue-600 hover:bg-blue-50"
+                      className="absolute right-1 top-1 lg:right-1.5 lg:top-1.5 h-7 w-7 lg:h-8 lg:w-8 p-0 text-amber-600 hover:bg-amber-50"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-neutral-400 mt-2 text-center">
+                  <p className="text-[9px] lg:text-[10px] text-neutral-400 mt-1.5 lg:mt-2 text-center">
                     Press Enter to quickly add a new tag
                   </p>
                 </div>
@@ -2164,114 +2303,153 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </div>
         </div>
 
-        {/* Action Buttons Block */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-2 p-2">
-          <div className="flex flex-wrap justify-between items-center gap-2">
-            {/* Left Buttons */}
-            <div className="flex space-x-2 flex-wrap items-center">
+        {/* Action Toggles Block - Tab-like for Mobile */}
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+            {/* Itinerary / Item-wise Group */}
+            <div className="flex items-center gap-1 p-1 bg-neutral-100/50 rounded-xl">
               <Button
-                variant={viewMode === 'itinerary' ? 'default' : 'outline'}
-                className="font-semibold whitespace-nowrap"
+                variant={viewMode === 'itinerary' ? 'white' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 text-[10px] lg:text-xs font-bold px-4 rounded-lg transition-all",
+                  viewMode === 'itinerary' ? "bg-white shadow-sm text-black" : "text-black"
+                )}
                 onClick={() => setViewMode('itinerary')}
               >
                 Itinerary
               </Button>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant={viewMode === 'all-inclusions' ? 'default' : 'outline'}
-                  className="font-semibold whitespace-nowrap"
-                  onClick={() => setViewMode('all-inclusions')}
-                >
-                  All Inclusions
-                </Button>
+              <Button
+                variant={viewMode === 'all-inclusions' ? 'white' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-8 text-[10px] lg:text-xs font-bold px-4 rounded-lg transition-all",
+                  viewMode === 'all-inclusions' ? "bg-white shadow-sm text-black" : "text-black"
+                )}
+                onClick={() => setViewMode('all-inclusions')}
+              >
+                Item-wise
+              </Button>
+            </div>
 
-                {/* Details Button */}
-                <Button
-                  variant="outline"
-                  className="font-semibold whitespace-nowrap gap-2"
-                  onClick={() => setIsDetailsModalOpen(true)}
-                >
-                  <FileText className="h-4 w-4" />
-                  Details
-                </Button>
+            {/* Details Button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setIsDetailsModalOpen(true)} 
+              className="h-8 px-3 text-[10px] lg:text-xs font-bold text-black hover:bg-neutral-100 rounded-lg flex items-center gap-1.5 border border-neutral-200"
+            >
+              <span className="hidden sm:inline-block"><Info className="h-3.5 w-3.5" /></span>
+              Details
+            </Button>
 
-                {/* Detailed View toggle - visible between All Inclusions and Pricing.
-                    Enabled only when All Inclusions view is active. */}
-                <div className="flex items-center gap-2 ml-2">
-                  <Switch
-                    checked={isDetailedView}
-                    onCheckedChange={setIsDetailedView}
-                  />
-                  <span className="text-sm font-medium text-gray-700">{isDetailedView ? "Detailed View" : "Summary View"}</span>
-                </div>
-
-                {/* Date Visibility Toggle */}
-                <div className="flex items-center gap-2 ml-2">
-                  <Switch
-                    checked={showDates}
-                    onCheckedChange={setShowDates}
-                  />
-                  <span className="text-sm font-medium text-gray-700">{showDates ? "Show Dates" : "Hide Dates"}</span>
-                </div>
-
-                {/* Pricing toggle: opens modal immediately when turned on */}
-                <div className="flex items-center space-x-2 pl-1">
-                  <Switch
-                    checked={pricingEnabled}
-                    onCheckedChange={(v) => {
-                      const enabled = Boolean(v)
-                      setPricingEnabled(enabled)
-                      if (enabled) {
-                        setPricingDialogOpen(true)
-                      } else {
-                        setPricingDialogOpen(false)
-                      }
-                    }}
-                    aria-label="Toggle pricing options"
-                  />
-                  <span className="text-sm text-gray-700 select-none">Pricing</span>
-                  {/* Minimal pricing summary */}
-                  <div className="ml-2 flex items-center gap-2 text-xs text-gray-600">
-                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded">
-                      <Users className="h-4 w-4 text-gray-500" />
-                      <span className="font-medium">{pricingAdults + pricingChildren}</span>
-                    </div>
-                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded">
-                      <Calendar className="h-4 w-4 text-gray-500" />
-                      <span>{pricingStartDate && pricingEndDate ? `${pricingStartDate} → ${pricingEndDate}` : 'Dates'}</span>
-                    </div>
-                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded">
-                      <DollarSign className="h-4 w-4 text-gray-500" />
-                      <span>{pricingMode === 'individual' ? 'Indv' : 'Total'}</span>
-                      <span className="ml-1 font-medium">{pricingCurrency}</span>
-                    </div>
-                  </div>
-                </div>
+            {/* Switch Group: Detailed, Dates, Pricing */}
+            <div className="flex items-center gap-4 lg:gap-6 border-l border-neutral-200 pl-4 lg:pl-6">
+              <div className="flex items-center gap-2">
+                <Switch id="detailed-v" checked={isDetailedView} onCheckedChange={setIsDetailedView} className="scale-75" />
+                <label htmlFor="detailed-v" className="text-[10px] font-bold text-black uppercase">Detailed</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="dates-v" checked={showDates} onCheckedChange={setShowDates} className="scale-75" />
+                <label htmlFor="dates-v" className="text-[10px] font-bold text-black uppercase">Dates</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="pricing-v" checked={pricingEnabled} onCheckedChange={(v) => {
+                  setPricingEnabled(Boolean(v))
+                  if (v) setPricingDialogOpen(true)
+                }} className="scale-75" />
+                <label htmlFor="pricing-v" className="text-[10px] font-bold text-black uppercase">Pricing</label>
               </div>
             </div>
-            {/* Right Buttons */}
-            <div className="flex space-x-2 flex-wrap">
-              {extraActions}
-              <Button variant="outline" size="icon" onClick={handleCreateCopy} disabled={isSaving} title="Copy" aria-label="Copy">
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} title="Preview" aria-label="Preview">
-                {isGeneratingPreview ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Eye className="h-4 w-4" />
+          </div>
+
+          <div className="flex items-center gap-1.5 lg:gap-2 ml-4">
+            <select
+              value={pricingCurrency}
+              onChange={(e) => {
+                const newCurrency = e.target.value
+                setPricingCurrency(newCurrency)
+                if (mode === 'quotation') {
+                  setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
+                }
+              }}
+              className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
+            >
+              <option value="INR">₹ INR</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+              <option value="AED">د.إ AED</option>
+            </select>
+            <Button variant="ghost" size="icon" onClick={handleCreateCopy} disabled={isSaving} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Copy Itinerary">
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Preview Itinerary">
+              {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <div className="w-px h-4 bg-neutral-200 mx-1" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Share">
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Download PDF">
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Pricing Info Display Row */}
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+            {/* Pax & Room Info */}
+            <div className="flex items-center gap-2 p-1 bg-neutral-100/50 rounded-xl px-3 h-9">
+              <div className="flex items-center gap-1.5 border-r border-neutral-200 pr-3 mr-1">
+                <Building2 className="h-3.5 w-3.5 text-neutral-500" />
+                <span className="text-[10px] lg:text-xs font-bold text-black uppercase">{pricingRooms} {pricingRooms === 1 ? 'Room' : 'Rooms'}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-neutral-500" />
+                  <span className="text-[10px] lg:text-xs font-bold text-black uppercase">{pricingAdults} Adults</span>
+                </div>
+                {pricingChildren > 0 && (
+                  <div className="flex items-center gap-1.5 border-l border-neutral-200 pl-3">
+                    <span className="text-[10px] lg:text-xs font-bold text-black uppercase">{pricingChildren} Children</span>
+                  </div>
                 )}
-              </Button>
-              <Button size="icon" onClick={handleSave} disabled={isSaving} title="Save" aria-label="Save">
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              </Button>
-              <Button variant="outline" size="icon" title="Share" aria-label="Share" onClick={() => { /* preserve share behavior if needed */ }}>
-                <Share2 className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" title="Download" aria-label="Download" onClick={() => { /* preserve download behavior if needed */ }}>
-                <Download className="h-4 w-4" />
-              </Button>
+              </div>
             </div>
+
+            {/* Nationality & Currency */}
+            <div className="flex items-center gap-4 lg:gap-6 border-l border-neutral-200 pl-4 lg:pl-6 h-9">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Nationality:</span>
+                <Badge variant="outline" className="bg-blue-50/50 text-blue-700 border-blue-100 text-[10px] font-bold uppercase">{pricingNationality}</Badge>
+              </div>
+              <div className="flex items-center gap-2 border-l border-neutral-200 pl-4 lg:pl-6">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Currency:</span>
+                <Badge variant="outline" className="bg-emerald-50/50 text-emerald-700 border-emerald-100 text-[10px] font-bold uppercase">{pricingCurrency}</Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Dates */}
+          <div className="flex items-center gap-4 border-l border-neutral-200 pl-4 h-9">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Travel Dates:</span>
+              <span className="text-[10px] lg:text-xs font-bold text-black uppercase">
+                {pricingStartDate ? new Date(pricingStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Set Date'}
+                {pricingEndDate && ` - ${new Date(pricingEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+              </span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setPricingDialogOpen(true)}
+              className="h-7 w-7 p-0 hover:bg-neutral-100 rounded-full"
+            >
+              <Plus className="h-3.5 w-3.5 text-neutral-500" />
+            </Button>
           </div>
         </div>
 
@@ -2436,18 +2614,20 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           <div className="space-y-1.5">
             {/* Overview Card - Appears Above Day 1 */}
             <Card
-              className={`relative border-2 ${dropTarget?.dayIndex === -2 ? "border-blue-400" : "border-indigo-200"} bg-indigo-50/30`}
+              className={`relative border-2 ${dropTarget?.dayIndex === -2 ? "border-blue-400" : "border-indigo-200"} bg-indigo-50/30 overflow-hidden rounded-xl`}
               onDragOver={(e) => {
                 e.preventDefault()
                 handleDragOver(-2, overviewEvents.length)
               }}
               onDrop={() => handleDrop(-2, overviewEvents.length)}
             >
-              <CardHeader className="pb-1.5 pt-2 px-2">
-                <div className="flex items-center justify-between">
+              <CardHeader className="pb-2 pt-3 px-3 lg:px-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Info className="h-5 w-5 text-indigo-600" />
-                    <h3 className="text-lg font-bold text-indigo-900">OVERVIEW</h3>
+                    <div className="p-1.5 bg-indigo-100 rounded-lg">
+                      <Info className="h-4 w-4 lg:h-5 lg:w-5 text-indigo-600" />
+                    </div>
+                    <h3 className="text-base lg:text-lg font-bold text-indigo-900 tracking-tight">OVERVIEW</h3>
                   </div>
                   <Button
                     variant="outline"
@@ -2464,22 +2644,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       }
                       setOverviewEvents([...overviewEvents, newNote])
                     }}
-                    className="text-sm"
+                    className="text-xs lg:text-sm w-full sm:w-auto h-8 lg:h-9 bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold"
                   >
-                    <Plus className="h-4 w-4 mr-1" />
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
                     Add Note
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-1.5 px-2 pb-2">
+              <CardContent className="pt-1 px-3 lg:px-4 pb-3">
                 {overviewEvents.length === 0 ? (
-                  <div className="text-center py-4 px-2 border-2 border-dashed border-indigo-200 rounded-md bg-white/50">
-                    <p className="text-sm text-gray-500">
-                      Drag a <strong>Notes</strong> component here or click <strong>Add Note</strong> to add overview information
+                  <div className="text-center py-6 px-4 border-2 border-dashed border-indigo-100 rounded-xl bg-white/60">
+                    <p className="text-xs lg:text-sm text-indigo-400 font-medium">
+                      Drag a <strong>Notes</strong> component here or click <strong>Add Note</strong>
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2 lg:space-y-3">
                     {overviewEvents.map((event, eventIndex) => (
                       <EventCard
                         key={`overview-${event.id}-${eventIndex}`}
@@ -2494,16 +2674,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                         onEdit={() => {
                           // Handle editing overview event
                           setEditingEvent({
-                            event,
-                            dayIndex: -2, // Special index for overview
-                            eventIndex,
+                            dayIndex: -2,
+                            eventIndex: eventIndex,
+                            event: { ...event }
                           })
+                          setIsEditModalOpen(true)
                         }}
                         onDelete={() => {
-                          // Handle deleting overview event
-                          const newOverviewEvents = [...overviewEvents]
-                          newOverviewEvents.splice(eventIndex, 1)
-                          setOverviewEvents(newOverviewEvents)
+                          const newEvents = [...overviewEvents]
+                          newEvents.splice(eventIndex, 1)
+                          setOverviewEvents(newEvents)
+                        }}
+                        onDuplicate={() => {
+                          const newEvent = { ...event, id: `event-${Date.now()}` }
+                          const newEvents = [...overviewEvents]
+                          newEvents.splice(eventIndex + 1, 0, newEvent)
+                          setOverviewEvents(newEvents)
                         }}
                       />
                     ))}
@@ -2516,22 +2702,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             {days.map((day, dayIndex) => (
               <Card
                 key={`day-${dayIndex}-${day.day}`}
-                className={`relative border-2 ${dropTarget?.dayIndex === dayIndex ? "border-blue-400" : "border-gray-200"}`}
+                className={`relative border-2 ${dropTarget?.dayIndex === dayIndex ? "border-blue-400" : "border-gray-200"} overflow-hidden rounded-xl shadow-sm`}
                 onDragOver={(e) => {
                   e.preventDefault()
                   handleDragOver(dayIndex, day.events.length)
                 }}
                 onDrop={() => handleDrop(dayIndex, day.events.length)}
               >
-                <CardHeader className="pb-1.5 pt-2 px-2">
-                  <div className="flex items-center justify-between">
+                <CardHeader className="pb-2 pt-3 px-3 lg:px-4 bg-gray-50/50 border-b border-gray-100">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <DayTitle
                       day={day.day}
                       title={day.title}
                       onTitleChange={(newTitle) => updateDayTitle(dayIndex, newTitle)}
                     />
-                    <div className="flex items-center gap-2">
-                      {/* Date Display (Right Side) */}
+                    <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                      {/* Date Display */}
                       {showDates && pricingStartDate && (() => {
                         const startDate = new Date(pricingStartDate)
                         const currentDate = new Date(startDate)
@@ -2543,48 +2729,51 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                         const weekday = currentDate.toLocaleString('default', { weekday: 'short' }).toUpperCase()
 
                         return (
-                          <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-lg shadow-sm w-12 h-12 shrink-0 overflow-hidden mr-2">
-                            <div className="text-[8px] font-bold text-amber-500 uppercase leading-none pt-1">
+                          <div className="flex flex-col items-center justify-center bg-white border border-gray-200 rounded-lg shadow-sm w-10 h-10 lg:w-12 lg:h-12 shrink-0 overflow-hidden">
+                            <div className="text-[7px] lg:text-[8px] font-bold text-amber-500 uppercase leading-none pt-0.5 lg:pt-1">
                               {month}-{year}
                             </div>
-                            <div className="text-lg font-bold text-gray-600 leading-none my-0.5">
+                            <div className="text-base lg:text-lg font-bold text-gray-600 leading-none my-0.5">
                               {dayNum}
                             </div>
-                            <div className="text-[8px] font-bold text-amber-500 uppercase leading-none pb-1">
+                            <div className="text-[7px] lg:text-[8px] font-bold text-amber-500 uppercase leading-none pb-0.5 lg:pb-1">
                               {weekday}
                             </div>
                           </div>
                         )
                       })()}
 
-                      <Button variant="ghost" size="sm" onClick={() => toggleDayCollapse(dayIndex)} className="p-2">
-                        {collapsedDays.has(dayIndex) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronUp className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setIsDetailedView(!isDetailedView)} className="p-2">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {days.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setDeletingDayIndex(dayIndex)
-                            setDeleteConfirmationOpen(true)
-                          }}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => toggleDayCollapse(dayIndex)} className="h-8 w-8 p-0">
+                          {collapsedDays.has(dayIndex) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4" />
+                          )}
                         </Button>
-                      )}
+                        <Button variant="ghost" size="sm" onClick={() => setIsDetailedView(!isDetailedView)} className="h-8 w-8 p-0">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {days.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDeletingDayIndex(dayIndex)
+                              setDeleteConfirmationOpen(true)
+                            }}
+                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 {!collapsedDays.has(dayIndex) && (
-                  <CardContent className="pt-1.5 px-2 pb-2">
+                  <CardContent className="pt-3 px-3 lg:px-4 pb-3">
+
                     <div className="mt-1 space-y-1.5">
                       {day.events.map((event, eventIndex) => (
                         <EventCard
@@ -2739,8 +2928,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
         {/* Pricing Display Section */}
         {pricingEnabled && (
-          <div className="mt-6 mb-2 p-6 rounded-xl border-2 bg-yellow-50/50 border-yellow-200 shadow-sm relative overflow-hidden">
-            {/* Auto Calculated Price Only */}
+          <div className="mt-12 mb-10 p-8 lg:p-12 rounded-3xl border border-neutral-200 bg-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start gap-12 border-t-[8px] border-t-[#f0c105]/80">
             {(() => {
               const pricingConfig: PricingConfig = {
                 adults: pricingAdults,
@@ -2765,144 +2953,170 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                 maximumFractionDigits: 0
               }).format(finalTotal)
 
+              const displaySubTotal = new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: pricingCurrency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              }).format(basePrice)
+
+              const strikethroughDisplay = new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: pricingCurrency,
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+              }).format(finalTotal * 1.4)
+
+              const totalPax = pricingAdults + pricingChildren
+
               return (
-                <div className="flex flex-col items-center justify-center">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-gray-500 text-xs font-bold uppercase tracking-[0.2em]">Total Amount</span>
-                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 text-[10px] font-black uppercase h-5 px-2">
-                      Final Quote
-                    </Badge>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <div className="text-5xl font-black text-green-700 tracking-tight">
-                      {displayTotal}
+                <>
+                  {/* Left Column: Contextual Branding */}
+                  <div className="flex-1 space-y-4">
+                    <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-[#f0c105] text-black text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
+                      Investment Detail
                     </div>
-                    
-                    <Button 
-                      onClick={() => setMarkupDialogOpen(true)}
-                      variant="outline" 
-                      size="sm" 
-                      className="bg-white hover:bg-yellow-100 border-yellow-300 text-yellow-700 font-bold h-10 px-4 rounded-lg shadow-sm"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Markup
-                    </Button>
+                    <h2 className="text-4xl lg:text-5xl font-serif text-neutral-900 leading-tight">
+                      Pricing Summary
+                    </h2>
+                    <p className="text-neutral-500 text-sm lg:text-base max-w-md font-medium leading-relaxed">
+                      A comprehensive breakdown of your travel investment, tailored to your unique preferences and selected inclusions.
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="text-[11px] text-gray-500 font-medium italic">
-                      Includes auto-calculated components
-                      {markupValue > 0 && (
-                        <span className="text-yellow-600 font-bold ml-1">
-                          + {markupType === 'percentage' ? `${markupValue}%` : `${pricingCurrency} ${markupValue}`} markup
-                        </span>
-                      )}
+                  {/* Right Column: Sleek Professional Financial Card */}
+                  <div className="flex-none w-full md:w-[360px] bg-white p-5 rounded-xl border border-neutral-200 shadow-sm">
+                    <div className="space-y-4">
+                      {/* Header & Currency */}
+                      <div className="flex justify-between items-center pb-2 border-b border-neutral-100">
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Investment Summary</span>
+                        <div className="flex justify-end w-[140px]">
+                          <select
+                            value={pricingCurrency}
+                            onChange={(e) => {
+                              const newCurrency = e.target.value
+                              setPricingCurrency(newCurrency)
+                              if (mode === 'quotation') {
+                                setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
+                              }
+                            }}
+                            className="text-[10px] font-bold text-neutral-600 bg-neutral-50 px-2 py-1 rounded border-none outline-none cursor-pointer hover:bg-neutral-100 transition-colors"
+                          >
+                            <option value="INR">INR</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="AED">AED</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Vertical Price Stack */}
+                      <div className="space-y-3">
+                        {/* Base Amount */}
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-neutral-500">Base Amount</span>
+                          <span className="w-[140px] text-right text-sm font-semibold text-neutral-800">{displaySubTotal}</span>
+                        </div>
+
+                        {/* Markup Control Section - Perfectly Aligned */}
+                        <div className="flex justify-between items-center py-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight flex-shrink-0">Markup</span>
+                            <div className="flex bg-neutral-100 rounded border border-neutral-200 p-0.5 scale-90">
+                              <button
+                                onClick={() => setMarkupType("percentage")}
+                                className={cn(
+                                  "px-1.5 py-0.5 text-[8px] font-bold rounded transition-colors",
+                                  markupType === "percentage" ? "bg-[#f0c105] text-black shadow-xs" : "text-neutral-400 hover:text-neutral-600"
+                                )}
+                                style={markupType === "percentage" ? { backgroundColor: 'rgba(240, 193, 5, 0.8)' } : {}}
+                              >
+                                %
+                              </button>
+                              <button
+                                onClick={() => setMarkupType("amount")}
+                                className={cn(
+                                  "px-1.5 py-0.5 text-[8px] font-bold rounded transition-colors",
+                                  markupType === "amount" ? "bg-[#f0c105] text-black shadow-xs" : "text-neutral-400 hover:text-neutral-600"
+                                )}
+                                style={markupType === "amount" ? { backgroundColor: 'rgba(240, 193, 5, 0.8)' } : {}}
+                              >
+                                AMT
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="w-[140px] flex items-center justify-end">
+                            <div className="relative flex items-center">
+                              <span className="text-[10px] font-bold text-neutral-400 mr-1">
+                                {markupType === "amount" ? (pricingCurrency === 'INR' ? '₹' : pricingCurrency) : ""}
+                              </span>
+                              <Input
+                                type="number"
+                                value={markupValue || ""}
+                                onChange={(e) => setMarkupValue(Number(e.target.value))}
+                                className="h-8 w-20 text-right text-xs font-bold bg-white border-neutral-200 px-2 rounded-md focus:ring-1 focus:ring-[#f0c105]/30"
+                                placeholder="0"
+                              />
+                              {markupType === "percentage" && (
+                                <span className="text-[10px] font-bold text-neutral-400 ml-1">%</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-neutral-100 pt-3 mt-1">
+                          <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Total Investment</span>
+                              {totalPax > 0 && <span className="text-[9px] text-neutral-400 font-medium tracking-tight">for {totalPax} Travelers</span>}
+                            </div>
+                            <span className="w-[140px] text-right text-2xl font-bold text-neutral-900 font-serif leading-none tracking-tight">
+                              {displayTotal}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Per Person Highlight */}
+                        {totalPax > 1 && (
+                          <div className="flex justify-between items-center pt-1 text-[11px]">
+                            <span className="text-neutral-400 italic">Estimated per person</span>
+                            <span className="w-[140px] text-right font-bold" style={{ color: 'rgba(240, 193, 5, 0.8)' }}>
+                              {new Intl.NumberFormat('en-IN', {
+                                style: 'currency',
+                                currency: pricingCurrency,
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                              }).format(finalTotal / totalPax)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
               )
             })()}
           </div>
         )}
 
-        {/* Markup Dialog */}
-        <Dialog open={markupDialogOpen} onOpenChange={setMarkupDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Itinerary Markup Settings</DialogTitle>
-              <DialogDescription>
-                Apply a markup to the total calculated price. This will update the final total shown to the client.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="flex flex-col gap-2">
-                <Label>Markup Type</Label>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                  <button
-                    onClick={() => setMarkupType("percentage")}
-                    className={cn(
-                      "flex-1 py-2 text-sm font-bold rounded-md transition-all",
-                      markupType === "percentage" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                    )}
-                  >
-                    Percentage (%)
-                  </button>
-                  <button
-                    onClick={() => setMarkupType("amount")}
-                    className={cn(
-                      "flex-1 py-2 text-sm font-bold rounded-md transition-all",
-                      markupType === "amount" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                    )}
-                  >
-                    Fixed Amount ({pricingCurrency})
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="markup-value">
-                  Markup {markupType === "percentage" ? "Percentage" : "Value"}
-                </Label>
-                <div className="relative">
-                  {markupType === "amount" && (
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
-                      {pricingCurrency}
-                    </span>
-                  )}
-                  <Input
-                    id="markup-value"
-                    type="number"
-                    value={markupValue || ""}
-                    onChange={(e) => setMarkupValue(Number(e.target.value))}
-                    className={cn("text-lg font-bold", markupType === "amount" && "pl-12")}
-                    placeholder={markupType === "percentage" ? "e.g. 15" : "e.g. 5000"}
-                  />
-                  {markupType === "percentage" && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
-                      %
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setMarkupValue(0)
-                  setMarkupType("amount")
-                  setMarkupDialogOpen(false)
-                }}
-                className="font-bold text-gray-500"
-              >
-                Reset Markup
-              </Button>
-              <Button 
-                onClick={() => setMarkupDialogOpen(false)}
-                className="bg-[#2D7CEA] hover:bg-[#1e63c7] text-white font-bold"
-              >
-                Apply Markup
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Action Buttons Section */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md">
-            <Mail className="mr-2 h-4 w-4" />
+        <div className="mt-4 mb-8 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
+            <Mail className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
             Enquire Now
           </Button>
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
-            <CreditCard className="mr-2 h-4 w-4" />
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
+            <CreditCard className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
             Book Now
           </Button>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md">
-            <Phone className="mr-2 h-4 w-4" />
+          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
+            <Phone className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
             Call
           </Button>
-          <Button className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white shadow-md">
-            <MessageCircle className="mr-2 h-4 w-4" />
+          <Button className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
+            <MessageCircle className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
             Whatsapp
           </Button>
         </div>
@@ -2910,41 +3124,46 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         {/* Library integration panel removed from builder view */}
       </div>
 
-      <div className={`border-l bg-white flex flex-col h-screen transition-all duration-300 ${isSidebarMinimized ? 'w-20' : 'w-80'}`}>
+      <div className={`hidden lg:flex border-t lg:border-t-0 lg:border-l bg-white flex-col transition-all duration-300 ${isSidebarMinimized ? 'h-auto lg:h-screen lg:w-20' : 'h-auto lg:h-screen w-full lg:w-80'} lg:sticky lg:top-0`}>
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="p-4 border-b flex-shrink-0 flex items-center justify-between">
-              {!isSidebarMinimized && <h3 className="font-semibold text-lg">Components</h3>}
+            <div className="p-3 lg:p-4 border-b flex-shrink-0 flex items-center justify-between bg-gray-50/30">
+              {!isSidebarMinimized && <h3 className="font-bold text-sm lg:text-lg text-neutral-800">Components</h3>}
+              {isSidebarMinimized && <h3 className="font-bold text-xs lg:hidden">Components</h3>}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsSidebarMinimized(!isSidebarMinimized)}
-                className="p-2"
+                className="h-8 w-8 lg:h-9 lg:w-9 p-0 hover:bg-gray-100"
                 title={isSidebarMinimized ? "Expand sidebar" : "Minimize sidebar"}
               >
-                {isSidebarMinimized ? <ChevronLeft className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 rotate-90" />}
+                {isSidebarMinimized ? <ChevronLeft className="h-4 w-4" /> : <ChevronDown className="h-4 w-4 lg:rotate-90" />}
               </Button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 min-h-0">
-              <div className={`space-y-3 ${isSidebarMinimized ? 'flex flex-col items-center' : ''}`}>
+            
+            <div className={`flex-1 overflow-y-auto p-3 lg:p-4 min-h-0 ${isSidebarMinimized ? 'hidden lg:block' : 'block'}`}>
+              <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2 lg:gap-3 ${isSidebarMinimized ? 'lg:flex lg:flex-col lg:items-center' : ''}`}>
                 {COMPONENT_TEMPLATES.filter(c => c.category !== 'visa' && c.category !== 'insurance').map((component) => {
                   const Icon = component.icon
                   return (
                     <Card
                       key={component.category}
-                      className={`${component.color} cursor-move hover:shadow-md transition-shadow ${isSidebarMinimized ? 'w-12 h-12 flex items-center justify-center' : ''}`}
+                      className={`${component.color} cursor-move hover:shadow-md transition-shadow border shadow-sm ${isSidebarMinimized ? 'lg:w-12 lg:h-12 flex lg:items-center lg:justify-center' : 'h-auto'}`}
                       draggable
                       onDragStart={() => handleDragStart("component", component)}
                       title={isSidebarMinimized ? component.title : undefined}
                     >
-                      <CardContent className={isSidebarMinimized ? "p-0 flex items-center justify-center" : "p-3"}>
+                      <CardContent className={isSidebarMinimized ? "p-0 lg:flex lg:items-center lg:justify-center" : "p-2.5 lg:p-3"}>
                         {isSidebarMinimized ? (
-                          <Icon className="h-5 w-5" />
-                        ) : (
+                          <div className="hidden lg:flex items-center justify-center w-full h-full">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                        ) : null}
+                        {(!isSidebarMinimized || (typeof window !== 'undefined' && window.innerWidth < 1024)) && (
                           <div className="flex items-center space-x-2">
-                            <GripVertical className="h-4 w-4 text-gray-400" />
-                            <Icon className="h-4 w-4" />
-                            <span className="font-medium">{component.title}</span>
+                            <GripVertical className="h-3.5 w-3.5 text-gray-400 hidden lg:block" />
+                            <Icon className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                            <span className="font-bold text-[10px] lg:text-sm text-neutral-700 truncate">{component.title}</span>
                           </div>
                         )}
                       </CardContent>
@@ -2956,8 +3175,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
             {/* Quotation Pricing Controls - Only in Quotation Mode */}
             {mode === 'quotation' && (
-              <div className="border-t p-4 flex-shrink-0 bg-gray-50/50">
-                <h3 className={`font-semibold text-lg mb-3 ${isSidebarMinimized ? 'hidden' : ''}`}>Pricing & Markup</h3>
+              <div className={`border-t p-4 flex-shrink-0 bg-gray-50/50 ${isSidebarMinimized ? 'hidden lg:block' : ''}`}>
+                <h3 className={`font-bold text-sm lg:text-lg mb-3 ${isSidebarMinimized ? 'hidden' : ''}`}>Pricing & Markup</h3>
                 <div className={isSidebarMinimized ? 'hidden' : ''}>
                   <QuotationPricingControls
                     initialOptions={quotationPricingOptions}
@@ -2972,13 +3191,12 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                   />
                 </div>
                 {isSidebarMinimized && (
-                  <div className="flex justify-center" title="Expand to see pricing controls">
-                    <DollarSign className="h-5 w-5 text-gray-400" />
+                  <div className="hidden lg:flex justify-center" title="Expand to see pricing controls">
+                    <DollarSign className="h-5 w-5 text-amber-500" />
                   </div>
                 )}
               </div>
             )}
-
           </div>
         </div>
       </div>
@@ -3025,13 +3243,58 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         onClose={() => setIsDetailsModalOpen(false)}
         guestDetails={guestDetails}
         agencyDetails={agencyDetails}
-        onSave={(newGuestDetails, newAgencyDetails) => {
+        headerFooter={headerFooter}
+        onSave={(newGuestDetails, newAgencyDetails, newHeaderFooter) => {
           setGuestDetails(newGuestDetails)
           setAgencyDetails(newAgencyDetails)
+          setHeaderFooter(newHeaderFooter)
+          setHasChanges(true)
         }}
       />
 
 
+
+      <Dialog open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+        <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden rounded-t-3xl border-none">
+          <DialogHeader className="p-4 border-b bg-neutral-50">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5 text-amber-500" />
+              Components
+            </DialogTitle>
+            <DialogDescription>
+              Drag or click a component to add it to your itinerary.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 overflow-y-auto max-h-[70vh]">
+            <div className="grid grid-cols-2 gap-3">
+              {COMPONENT_TEMPLATES.filter(c => c.category !== 'visa' && c.category !== 'insurance').map((component) => {
+                const Icon = component.icon
+                return (
+                  <Card
+                    key={component.category}
+                    className={`${component.color} cursor-pointer hover:shadow-md transition-all active:scale-95 border shadow-sm`}
+                    onClick={() => {
+                      // On mobile, just add to the end of the first day or current active view
+                      handleSelectManualComponent(component.category)
+                      setMobileSidebarOpen(false)
+                    }}
+                  >
+                    <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
+                      <div className="p-2 bg-white/50 rounded-full">
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <span className="font-bold text-xs text-neutral-700">{component.title}</span>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+          <DialogFooter className="p-4 border-t bg-neutral-50">
+            <Button className="w-full font-bold" onClick={() => setMobileSidebarOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={validationErrorOpen} onOpenChange={setValidationErrorOpen}>
         <DialogContent className="sm:max-w-[500px]">

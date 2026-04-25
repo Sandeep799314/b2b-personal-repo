@@ -587,7 +587,46 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   }
 
   return (
-    <div className="flex h-screen relative">
+    <div className="flex flex-col lg:flex-row h-screen relative overflow-x-hidden bg-[#f8fafc]">
+      {/* Mobile Sticky Header - ONLY visible on mobile */}
+      <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200 px-4 py-3 flex items-center justify-between shadow-sm">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Editor Mode</span>
+          <h1 className="text-sm font-bold text-neutral-800 truncate max-w-[180px]">{title || "Untitled Cart/Combo"}</h1>
+        </div>
+        <div className="flex items-center gap-2">
+           <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            size="sm"
+            className={`${showSaved ? 'bg-green-600' : 'bg-[#2D7CEA]'} text-white rounded-full px-4 h-8 text-xs font-bold shadow-lg shadow-blue-500/20`}
+          >
+            {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : showSaved ? <Check className="h-3 w-3 mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
+            {isSaving ? "..." : showSaved ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Vertical EDITOR MODE strip */}
+      <div
+        className="hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40"
+        style={{
+          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
+        }}
+      >
+        <span
+          className="text-white font-bold text-sm tracking-widest whitespace-nowrap uppercase lg:sticky lg:top-1/2 lg:-translate-y-1/2"
+          style={{
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            transform: 'rotate(180deg)',
+            letterSpacing: '0.15em'
+          }}
+        >
+          Editor Mode
+        </span>
+      </div>
+
       {/* Main Content */}
       <div className="flex-1 p-6 overflow-y-auto">
         {/* Header */}
@@ -679,7 +718,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
                   return (
                     <div
                       key={item.id}
-                      className="border-2 rounded-xl overflow-hidden hover:shadow-lg transition-shadow bg-white"
+                      className="border-2 rounded-xl overflow-hidden hover:shadow-lg transition-shadow bg-white border-l-4 border-l-yellow-400"
                     >
                       <div className="flex items-center">
                         {/* Date Section - Left Side */}
@@ -1318,7 +1357,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
                             return (
                               <div
                                 key={item.id}
-                                className="flex items-start gap-4 p-4 rounded-lg border-2 border-gray-100 hover:border-blue-200 transition-colors bg-white"
+                                className="flex items-start gap-4 p-4 rounded-lg border-2 border-gray-100 hover:border-blue-200 transition-colors bg-white border-l-4 border-l-yellow-400"
                               >
                                 {/* Icon */}
                                 <div className={`p-3 rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS.other} flex-shrink-0`}>

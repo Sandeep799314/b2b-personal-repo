@@ -1,9 +1,8 @@
 "use client"
 
-import { Plane, Clock, Luggage, Shield, FileText, Image as ImageIcon } from "lucide-react"
+import { Plane, Luggage, Shield, FileText, Clock } from "lucide-react"
 import { IItineraryEvent } from "@/models/Itinerary"
 import { EventSourceBadge } from "./source-badge"
-import { Badge } from "@/components/ui/badge"
 import { calculateFlightPrice } from "@/lib/pricing-calculator"
 
 interface FlightEventProps {
@@ -25,7 +24,6 @@ export function FlightEvent({
   pricingCurrency = "INR",
   pricingMode = 'individual',
 }: FlightEventProps) {
-  // Always calculate price conversion when price exists
   const priceResult = event.price
     ? calculateFlightPrice(event, {
       adults: pricingAdults,
@@ -33,34 +31,6 @@ export function FlightEvent({
       targetCurrency: pricingCurrency
     })
     : null
-
-  if (!isDetailedView) {
-    // Summary view: show only fromCity -> toCity
-    return (
-      <div className="bg-white p-2 rounded-lg border border-gray-200 relative">
-        <EventSourceBadge event={event} />
-        <div className="flex items-center gap-1.5">
-          <Plane className="h-3.5 w-3.5 text-gray-700" />
-          <h4 className="text-sm font-semibold text-gray-800">{event.fromCity} ⟶ {event.toCity}</h4>
-        </div>
-      </div>
-    )
-  }
-
-  // Format luggage display
-  const luggageDisplay = (() => {
-    if (event.checkinBags || event.cabinBags) {
-      const parts = []
-      if (event.checkinBags) {
-        parts.push(`${event.checkinBags}×${event.checkinBagWeight || ""}`)
-      }
-      if (event.cabinBags) {
-        parts.push(`Cabin: ${event.cabinBags}×${event.cabinBagWeight || ""}`)
-      }
-      return parts.join(" + ")
-    }
-    return event.baggage
-  })()
 
   // Format stops display
   const stopsDisplay = (() => {
@@ -72,214 +42,87 @@ export function FlightEvent({
   })()
 
   return (
-    <div className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative">
+    <div className="group relative bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-all duration-300 mb-3">
       <EventSourceBadge event={event} />
-
-      {/* Flight Header */}
-      <div className="mb-1.5 pb-2 border-b border-gray-100">
-        <div className="flex items-center gap-1.5">
-          <Plane className="h-3.5 w-3.5 text-blue-600" />
-          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wide">Flight</h3>
-        </div>
-        {event.title && (
-          <div className="text-sm font-semibold text-gray-800 mt-1">{event.title}</div>
-        )}
-      </div>
-
-      {/* Compact Route Header */}
-      <div className="flex items-start mb-1.5">
-        {/* From City */}
-        <div className="w-24">
-          <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">From</div>
-          <div className="text-2xl font-bold text-gray-900">{event.fromCity || "Origin"}</div>
+      
+      <div className="flex items-start gap-4">
+        {/* Icon Container - Matching NewTemplate style */}
+        <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-[#FFF8E1] flex items-center justify-center border border-[rgba(240,193,5,0.3)] text-[#9A7B00]">
+          <Plane className="h-5 w-5" />
         </div>
 
-        {/* Arrow Section with Stops Above and Duration Below */}
-        <div className="flex flex-col items-center justify-center min-w-[100px] mx-6">
-          {/* Stops Above Arrow */}
-          <div className="text-xs text-gray-600 mb-0.5 whitespace-nowrap">
-            {stopsDisplay}
+        {/* Content Section */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-bold tracking-[0.15em] text-[#64748b] uppercase">Flight</span>
+            {priceResult && pricingEnabled && pricingMode === 'individual' && (
+               <div className="text-right">
+                  <span className="text-sm font-bold text-slate-900 font-serif">{priceResult.displayPrice}</span>
+                  <div className="text-[8px] text-slate-400 uppercase tracking-tighter">
+                    {priceResult.breakdown || "PER COMPONENT"}
+                  </div>
+               </div>
+            )}
+          </div>
+          
+          <h4 className="text-base font-medium text-slate-800 font-serif leading-snug">
+            {event.fromCity} ⟶ {event.toCity}
+          </h4>
+          
+          <div className="mt-2 flex flex-wrap items-center gap-y-1 gap-x-4">
+             <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+               <Clock className="h-3 w-3" />
+               <span>{event.startTime || event.time || "--:--"} - {event.endTime || "--:--"}</span>
+             </div>
+             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+               <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[#9A7B00]">{stopsDisplay}</span>
+             </div>
+             {event.airlines && (
+               <div className="text-[11px] font-bold text-slate-700">
+                 {event.airlines} {event.flightNumber && <span className="font-normal text-slate-400 ml-1">{event.flightNumber}</span>}
+               </div>
+             )}
           </div>
 
-          {/* Arrow */}
-          <div className="flex items-center w-full">
-            <div className="flex-1 h-px bg-blue-400"></div>
-            <svg className="w-5 h-5 text-blue-600 mx-1" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            <div className="flex-1 h-px bg-blue-400"></div>
-          </div>
-
-          {/* Duration Below Arrow */}
-          <div className="text-sm font-semibold text-blue-600 mt-0.5">
-            {event.duration || "--"}
-          </div>
-        </div>
-
-        {/* To City */}
-        <div className="w-24">
-          <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">To</div>
-          <div className="text-2xl font-bold text-gray-900">{event.toCity || "Destination"}</div>
-        </div>
-      </div>
-
-      {/* Flight Times - Compact */}
-      <div className="flex items-start mb-1.5">
-        <div className="w-24">
-          <div className="text-3xl font-bold text-gray-900">{event.startTime || event.time || "--:--"}</div>
-          <div className="text-[10px] text-gray-500 uppercase">Departure</div>
-        </div>
-        <div className="min-w-[100px] mx-6"></div>
-        <div className="w-24">
-          <div className="text-3xl font-bold text-gray-900">{event.endTime || "--:--"}</div>
-          <div className="text-[10px] text-gray-500 uppercase">Arrival</div>
-        </div>
-      </div>
-
-      {/* Airline Info - Compact */}
-      {(event.airlines || event.flightNumber) && (
-        <div className="mb-1.5 pb-1.5 border-b border-gray-100">
-          {event.airlines && (
-            <div className="text-base font-bold text-gray-800">{event.airlines}</div>
-          )}
-          {event.flightNumber && (
-            <div className="text-xs text-gray-600">{event.flightNumber}</div>
-          )}
-        </div>
-      )}
-
-      {/* Footer Info: Class, Luggage, Booking Details */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 bg-gray-50 p-2 rounded mt-2">
-        {event.flightClass && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <span className="font-medium text-blue-700">{event.flightClass}</span>
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-          <Luggage className="h-3.5 w-3.5 text-gray-500" />
-          <span>{luggageDisplay || "20kg check-in + 7kg cabin"}</span>
-        </div>
-        {event.refundable && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <Shield className="h-3.5 w-3.5 text-green-600" />
-            <span className="text-green-700 font-medium">{event.refundable}</span>
-          </div>
-        )}
-        {event.pnr && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <span className="text-gray-500">PNR:</span>
-            <span className="font-mono font-medium text-gray-900">{event.pnr}</span>
-          </div>
-        )}
-        {event.bookingId && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <FileText className="h-3.5 w-3.5 text-purple-500" />
-            <span className="font-medium">Booking ID: {event.bookingId}</span>
-          </div>
-        )}
-        {event.seatNumber && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <span className="text-gray-500">Seat:</span>
-            <span className="font-medium">{event.seatNumber}</span>
-          </div>
-        )}
-        {event.inFlightMeals && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded border border-gray-100 shadow-sm">
-            <span className="text-gray-500">Meal:</span>
-            <span className="font-medium">{event.inFlightMeals}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Amenities */}
-      {event.highlights && event.highlights.length > 0 && (
-        <div className="mb-2">
-          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Amenities</div>
-          <div className="flex flex-wrap gap-1">
-            {event.highlights.map((highlight, index) => (
-              <span
-                key={index}
-                className="inline-block px-2 py-0.5 rounded-full bg-gray-100 text-xs text-gray-700"
-              >
-                {highlight}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Flight Notes */}
-      {event.flightNotes && (
-        <div className="mb-2 p-2 bg-amber-50 rounded border-l-2 border-amber-400">
-          <p className="text-xs text-amber-900 leading-snug">{event.flightNotes}</p>
-        </div>
-      )}
-
-      {/* Description - No Heading */}
-      {event.description && event.description.trim() && event.description !== event.mainPoint && (
-        <div className="mb-2">
-          <p className="text-xs text-gray-700 leading-relaxed">{event.description}</p>
-        </div>
-      )}
-
-      {/* Images */}
-      {event.images && event.images.length > 0 && (
-        <div className="mb-2">
-          <div className="grid grid-cols-4 gap-2">
-            {event.images.map((img, idx) => (
-              <img
-                key={idx}
-                src={img}
-                alt={`Flight ${idx + 1}`}
-                className="w-full h-14 object-cover rounded border border-gray-200"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Additional Info Sections */}
-      {event.additionalInfoSections && event.additionalInfoSections.length > 0 && (
-        <div className="space-y-1.5">
-          {event.additionalInfoSections.map((section, idx) => (
-            <div key={idx} className="p-2 bg-blue-50 rounded border-l-2 border-blue-400">
-              <h5 className="text-xs font-semibold text-blue-900">{section.heading}</h5>
-              <p className="text-xs text-blue-800 leading-snug mt-0.5">{section.content}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Price - Always show if price exists */}
-      {event.price && pricingEnabled && pricingMode === 'individual' && (
-        <div className="pt-2 mt-2 border-t border-gray-200">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">
-              {priceResult ? priceResult.breakdown : "Price"}
-            </span>
-            <div className="text-right">
-              {priceResult ? (
-                <>
-                  <span className="text-base font-bold text-gray-900">
-                    {priceResult.displayPrice}
-                  </span>
-                  <span className="text-xs text-gray-400 ml-1">
-                    ({priceResult.originalDisplayPrice}/pax)
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-base font-bold text-gray-900">
-                    {event.currency === "INR" ? "₹" : event.currency === "EUR" ? "€" : event.currency === "GBP" ? "£" : event.currency === "AED" ? "AED " : "$"}
-                    {event.price}
-                  </span>
-                  <span className="text-xs text-gray-500 ml-1">/pax</span>
-                </>
+          {/* Boarding Pass Style Details */}
+          {isDetailedView && (
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Class</span>
+                <span className="text-xs font-semibold text-slate-700">{event.flightClass || "Economy"}</span>
+              </div>
+              <div>
+                <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Baggage</span>
+                <div className="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                  <Luggage className="h-3 w-3" />
+                  <span>{event.baggage || "20kg + 7kg"}</span>
+                </div>
+              </div>
+              {event.pnr && (
+                <div>
+                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">PNR</span>
+                  <span className="text-xs font-mono font-bold text-blue-600">{event.pnr}</span>
+                </div>
+              )}
+              {event.refundable && (
+                <div>
+                  <span className="block text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Policy</span>
+                  <div className="flex items-center gap-1 text-xs font-semibold text-green-600">
+                    <Shield className="h-3 w-3" />
+                    <span>{event.refundable}</span>
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          )}
+
+          {event.description && (
+            <p className="mt-3 text-xs text-slate-500 leading-relaxed italic">
+              {event.description}
+            </p>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -5,15 +5,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Calendar, MapPin, Clock, Edit, Package, ShoppingCart, FileText, Users, DollarSign, Share2, Copy, FileDigit, Loader2, Trash2 } from "lucide-react"
+import { Plus, Calendar, MapPin, Clock, Edit, Package, ShoppingCart, FileText, Users, DollarSign, Share2, Copy, FileDigit, Loader2, Trash2, MoreVertical, Eye, Sun, Moon, History, X } from "lucide-react"
 import { IItinerary } from "@/models/Itinerary"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useQuotations } from "@/hooks/use-quotations"
 import { getAuthHeaders } from "@/lib/client-auth"
+import { getDefaultImageByString } from "@/lib/constants"
 
 interface ItineraryListProps {
   onCreateNew: () => void
@@ -55,6 +63,8 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itineraryToDelete, setItineraryToDelete] = useState<IItinerary | null>(null)
+  const [menuView, setMenuView] = useState<Record<string, 'options' | 'logs'>>({})
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({})
   const [isDeleting, setIsDeleting] = useState(false)
 
   const { toast } = useToast()
@@ -62,6 +72,16 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
   const searchParams = useSearchParams()
   const selectForQuotation = searchParams.get("selectForQuotation") === "true"
   const { convertItineraryToQuotation, isLoading: isConverting } = useQuotations()
+
+  const formatLogDate = (dateInput: Date | string) => {
+    const d = new Date(dateInput)
+    const day = d.getDate().toString().padStart(2, "0")
+    const month = d.toLocaleString("en-US", { month: "short" })
+    const year = d.getFullYear()
+    const hours = d.getHours().toString().padStart(2, "0")
+    const minutes = d.getMinutes().toString().padStart(2, "0")
+    return `${day}-${month}-${year} : ${hours}:${minutes} hrs`
+  }
 
   // Load itineraries
   useEffect(() => {
@@ -266,7 +286,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
         {filteredItineraries.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-300" />
@@ -288,144 +308,262 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
 
             // Find first image
             const firstImage = itinerary.gallery && itinerary.gallery.find(item => item.type === "image")
+            const displayImage = firstImage?.url || getDefaultImageByString(itinerary._id || "")
+            const currentMenuView = menuView[itinerary._id!] || 'options'
+            const isExpanded = expandedDescriptions[itinerary._id!] || false
+
+            const daysCount = itinerary.days?.length || (parseInt(itinerary.duration) || 0)
+            const nightsCount = (itinerary.days?.reduce((acc, day) => acc + (day.nights || 0), 0)) || 
+                               Math.max(0, (itinerary.days?.length || (parseInt(itinerary.duration) || 1)) - 1)
 
             return (
               <Card
                 key={itinerary._id}
-                className="hover:shadow-md transition-shadow h-full flex flex-col overflow-hidden group border-neutral-200"
+                className="hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group border-neutral-200 hover:border-brand-200"
               >
-                {/* Preview Photo or Placeholder */}
-                <div className="h-32 w-full bg-gray-100 relative overflow-hidden shrink-0">
-                  {firstImage ? (
-                    <img
-                      src={firstImage.url}
-                      alt={firstImage.altText || itinerary.title}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className={`w-full h-full flex items-center justify-center ${typeConfig.color} bg-opacity-20`}>
-                      <TypeIcon className="h-10 w-10 opacity-20" />
-                    </div>
-                  )}
-                  {/* Overlay Badge */}
-                  <div className="absolute top-2 right-2">
-                    <Badge className={`${typeConfig.color} shadow-sm border text-[10px] px-1.5 py-0`}>
-                      <TypeIcon className="h-2.5 w-2.5 mr-1" />
+                {/* Image Section */}
+                <div className="h-36 w-full bg-neutral-100 relative overflow-hidden shrink-0">
+                  <img
+                    src={displayImage}
+                    alt={firstImage?.altText || itinerary.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  
+                  {/* Category Badge */}
+                  <div className="absolute top-3 right-3">
+                    <Badge className={`${typeConfig.color} shadow-sm border-none text-[10px] font-medium px-2.5 py-1 rounded-full backdrop-blur-md bg-opacity-90`}>
+                      <TypeIcon className="h-3 w-3 mr-1.5" />
                       {typeConfig.label}
                     </Badge>
                   </div>
                 </div>
 
-                <CardHeader className="p-3 pb-0">
-                  <div className="space-y-0.5">
-                    <CardTitle className="text-sm font-semibold line-clamp-1" title={itinerary.title}>
-                      {itinerary.title}
-                    </CardTitle>
-                    <CardDescription className="flex items-center text-[11px] text-gray-500">
-                      <MapPin className="mr-1 h-2.5 w-2.5 shrink-0" />
-                      <span className="line-clamp-1">{itinerary.destination || "Multiple Destinations"}</span>
-                    </CardDescription>
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-0.5 flex-1 min-w-0">
+                      <CardTitle className="text-base font-bold text-neutral-900 line-clamp-1 group-hover:text-brand-700 transition-colors" title={itinerary.title}>
+                        {itinerary.title}
+                      </CardTitle>
+                      <div className="flex items-center text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+                        <MapPin className="mr-1 h-3 w-3" />
+                        {itinerary.destination || "Multiple Destinations"}
+                      </div>
+                    </div>
+                    {!selectForQuotation && (
+                      <DropdownMenu onOpenChange={(open) => {
+                        if (!open) {
+                          // Small delay to prevent layout shift during animation
+                          setTimeout(() => setMenuView(prev => ({ ...prev, [itinerary._id!]: 'options' })), 200)
+                        }
+                      }}>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 -mr-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-neutral-100">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className={currentMenuView === 'logs' ? "w-64 p-3" : "w-48"}>
+                          {currentMenuView === 'options' ? (
+                            <>
+                              <DropdownMenuItem onClick={() => onViewItinerary(itinerary._id!)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Itinerary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onEditItinerary(itinerary._id!)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Itinerary
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => createQuickShare(itinerary)}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share Link
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onSelect={(e) => {
+                                e.preventDefault()
+                                setMenuView(prev => ({ ...prev, [itinerary._id!]: 'logs' }))
+                              }}>
+                                <History className="mr-2 h-4 w-4" />
+                                Logs
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteClick(itinerary)}
+                                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between border-b pb-2">
+                                <span className="text-xs font-bold flex items-center gap-1.5 text-neutral-900">
+                                  <History className="h-3.5 w-3.5 text-brand-600" />
+                                  Audit Logs
+                                </span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-5 w-5 rounded-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setMenuView(prev => ({ ...prev, [itinerary._id!]: 'options' }))
+                                  }}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                              
+                              <div className="space-y-3 text-[11px]">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-neutral-700">Created</p>
+                                  <div className="flex flex-col text-neutral-500">
+                                    <span className="truncate">By: {itinerary.createdByUser || "System"}</span>
+                                    <span className="text-neutral-400">
+                                      {formatLogDate(itinerary.createdAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-neutral-700">Last Updated</p>
+                                  <div className="flex flex-col text-neutral-500">
+                                    <span className="truncate">By: {itinerary.lastUpdatedBy || itinerary.createdByUser || "System"}</span>
+                                    <span className="text-neutral-400">
+                                      {formatLogDate(itinerary.updatedAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </CardHeader>
 
-                <CardContent className="flex-1 flex flex-col p-3 pt-2">
-                  <div className="space-y-2 flex-1">
-                    {/* Duration and Price */}
-                    <div className="flex items-center justify-between text-[11px]">
-                      <div className="flex items-center text-gray-500 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                        <Clock className="mr-1 h-3 w-3" />
-                        {itinerary.duration}
+                <CardContent className="flex-1 flex flex-col p-4 pt-0">
+                  <div className="space-y-3 flex-1 flex flex-col">
+                    {/* Metadata Row */}
+                    <div className="flex items-center justify-between min-h-[24px]">
+                      <div className="flex items-center gap-2">
+                        {itinerary.productReferenceCode && (
+                          <div className="text-[9px] font-bold text-brand-600 bg-brand-50/50 px-1.5 py-0.5 rounded border border-brand-100/50 uppercase tracking-wide w-fit">
+                            {itinerary.productReferenceCode}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1 bg-neutral-100 px-1.5 py-0.5 rounded text-[9px] font-bold text-neutral-700 w-fit">
+                          <Sun className="h-2.5 w-2.5 text-amber-500" />
+                          <span>{daysCount}D</span>
+                          <span className="text-neutral-300">|</span>
+                          <Moon className="h-2.5 w-2.5 text-blue-500" />
+                          <span>{nightsCount}N</span>
+                        </div>
                       </div>
-                      {itinerary.totalPrice > 0 && (
-                        <div className="flex items-center text-brand-700 font-bold bg-brand-50 px-1.5 py-0.5 rounded border border-brand-100">
-                          {new Intl.NumberFormat('en-US', {
-                            style: 'currency',
-                            currency: itinerary.currency || 'USD',
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 0,
-                          }).format(itinerary.totalPrice)}
+
+                      {/* Highlights/Tags */}
+                      <div className="flex items-center gap-1 overflow-hidden">
+                        {itinerary.highlights?.slice(0, 2).map((highlight, idx) => (
+                          <Badge 
+                            key={idx} 
+                            variant="secondary" 
+                            className="text-[8px] px-1.5 py-0 h-4 bg-blue-50 text-blue-600 border-blue-100 font-bold uppercase tracking-tight whitespace-nowrap"
+                          >
+                            {highlight}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Description and Price Row */}
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className={`${isExpanded ? "min-h-0" : "h-[40px]"} overflow-hidden transition-all duration-300`}>
+                          <p className={`text-[12px] text-neutral-600 leading-[1.6] font-medium ${isExpanded ? "" : "line-clamp-2"}`}>
+                            {itinerary.description || "Experience a meticulously planned journey featuring handpicked accommodations and exclusive activities."}
+                          </p>
                         </div>
-                      )}
-                    </div>
+                        {(itinerary.description?.length || 0) > 100 && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedDescriptions(prev => ({ ...prev, [itinerary._id!]: !isExpanded }));
+                            }}
+                            className="text-[11px] font-bold text-brand-600 hover:text-brand-700 mt-1 flex items-center gap-0.5 group/btn"
+                          >
+                            <span>{isExpanded ? "See less" : "See more"}</span>
+                            <div className={`h-1 w-1 rounded-full bg-brand-400 transition-transform ${isExpanded ? "scale-150" : "group-hover/btn:scale-150"}`} />
+                          </button>
+                        )}
+                      </div>
 
-                    {/* Description */}
-                    <p className="text-[11px] text-gray-600 line-clamp-2 leading-relaxed">
-                      {itinerary.description || "No description available."}
-                    </p>
-
-                    {/* Metadata Section */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-50 mt-auto text-[10px] text-gray-400">
-                      {itinerary.productReferenceCode ? (
-                        <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-[9px]">{itinerary.productReferenceCode}</span>
-                      ) : (
-                        <span></span>
-                      )}
-                      <span>
-                        {new Date(itinerary.updatedAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Actions Footer */}
-                  <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-gray-100">
-                    {selectForQuotation ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="w-full h-8 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-medium"
-                        onClick={() => handleItinerarySelect(itinerary)}
-                      >
-                        <FileDigit className="h-3 w-3 mr-1.5" />
-                        Select
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 h-7 text-[11px] hover:bg-brand-50"
-                          onClick={() => onViewItinerary(itinerary._id!)}
-                          disabled={isViewing}
-                        >
-                          {isViewing ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
+                      <div className="shrink-0 flex flex-col items-end">
+                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-[0.1em] mb-0.5">Total Cost</span>
+                        <div className="text-2xl font-black text-neutral-900 tracking-tighter leading-none">
+                          {itinerary.totalPrice > 0 ? (
+                            new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: itinerary.currency || 'USD',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }).format(itinerary.totalPrice)
                           ) : (
-                            "View"
+                            <span className="text-neutral-300 font-medium text-base">On Request</span>
                           )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 h-7 text-[11px] hover:bg-blue-50"
-                          onClick={() => onEditItinerary(itinerary._id!)}
-                        >
-                          Edit
-                        </Button>
-                        <div className="flex gap-0.5 border-l border-gray-100 pl-1 ml-0.5">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-gray-400 hover:text-brand-600"
-                            onClick={() => createQuickShare(itinerary)}
-                            title="Share"
-                          >
-                            <Share2 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-gray-400 hover:text-red-600"
-                            onClick={() => handleDeleteClick(itinerary)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
-                      </>
-                    )}
+                      </div>
+                    </div>
+
+                    {/* Actions and Footer */}
+                    <div className="mt-auto pt-3 border-t border-neutral-100">
+                      {selectForQuotation ? (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-sm transition-all active:scale-[0.98]"
+                          onClick={() => handleItinerarySelect(itinerary)}
+                        >
+                          Create Quotation
+                        </Button>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-brand-600 h-9 transition-colors"
+                              onClick={() => onViewItinerary(itinerary._id!)}
+                              disabled={isViewing}
+                              title="View Itinerary"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-brand-600 h-9 transition-colors"
+                              onClick={() => onEditItinerary(itinerary._id!)}
+                              title="Edit Itinerary"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 border-neutral-200 text-neutral-700 hover:bg-neutral-50 hover:text-brand-600 h-9 transition-colors"
+                              onClick={() => createQuickShare(itinerary)}
+                              title="Quick Share"
+                            >
+                              <Share2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="text-[9px] text-neutral-400 font-medium flex items-center justify-center gap-1">
+                            <Clock className="h-2.5 w-2.5" />
+                            Updated {formatLogDate(itinerary.updatedAt)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

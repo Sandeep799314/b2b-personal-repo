@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { MapPin, Download, Share2, Save, ChevronDown, FileText, FileImage } from "lucide-react"
+import { MapPin, Download, Share2, Save, ChevronDown, FileText, FileImage, Sun, Moon } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,10 +36,12 @@ interface ItineraryHeaderProps {
   days: number
   nights: number
   country: string
+  productReferenceCode: string
   highlights: string[]
   onSave: () => void
   onTitleChange: (value: string) => void
   onDescriptionChange: (value: string) => void
+  onProductReferenceCodeChange: (value: string) => void
   onHighlightsChange: (value: string[]) => void
   onCountryChange: (value: string) => void
   onDaysChange: (value: number) => void
@@ -74,10 +76,12 @@ export function ItineraryHeader({
   days,
   nights,
   country,
+  productReferenceCode,
   highlights,
   onSave,
   onTitleChange,
   onDescriptionChange,
+  onProductReferenceCodeChange,
   onHighlightsChange,
   onCountryChange,
   onDaysChange,
@@ -330,28 +334,37 @@ export function ItineraryHeader({
         </div>
       </div>
 
+      {/* Destination and Product Reference */}
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 flex-1">
+          <MapPin className="h-5 w-5 text-gray-500" />
+          <Input
+            value={country}
+            onChange={(e) => onCountryChange(e.target.value)}
+            placeholder="Enter destination..."
+            className="border-none p-0 text-base font-semibold focus-visible:ring-0"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-1">
+          <FileText className="h-5 w-5 text-gray-500" />
+          <Input
+            value={productReferenceCode}
+            onChange={(e) => onProductReferenceCodeChange(e.target.value)}
+            placeholder="Product Reference Code..."
+            className="border-none p-0 text-base font-semibold focus-visible:ring-0"
+          />
+        </div>
+      </div>
+
       {/* Description */}
       <div className="space-y-1">
         <Textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder="Enter itinerary description..."
-          className="min-h-[80px] border-none resize-none p-0 text-base"
+          className="min-h-[80px] border-none resize-none p-0 text-base focus-visible:ring-0"
           aria-label="Itinerary description"
         />
-      </div>
-
-      {/* Destination */}
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-gray-500" />
-          <Input
-            value={country}
-            onChange={(e) => onCountryChange(e.target.value)}
-            placeholder="Enter destination..."
-            className="border-none p-0 text-base font-semibold"
-          />
-        </div>
       </div>
 
       {/* Highlights */}

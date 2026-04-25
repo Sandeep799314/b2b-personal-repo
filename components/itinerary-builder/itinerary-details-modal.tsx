@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IItinerary } from "@/models/Itinerary"
@@ -14,7 +15,12 @@ interface ItineraryDetailsModalProps {
     onClose: () => void
     guestDetails: IItinerary['guestDetails']
     agencyDetails: IItinerary['agencyDetails']
-    onSave: (guestDetails: IItinerary['guestDetails'], agencyDetails: IItinerary['agencyDetails']) => void
+    headerFooter: IItinerary['headerFooter']
+    onSave: (
+        guestDetails: IItinerary['guestDetails'], 
+        agencyDetails: IItinerary['agencyDetails'],
+        headerFooter: IItinerary['headerFooter']
+    ) => void
 }
 
 export function ItineraryDetailsModal({
@@ -22,6 +28,7 @@ export function ItineraryDetailsModal({
     onClose,
     guestDetails,
     agencyDetails,
+    headerFooter,
     onSave,
 }: ItineraryDetailsModalProps) {
     const [activeTab, setActiveTab] = useState("guest")
@@ -44,6 +51,14 @@ export function ItineraryDetailsModal({
         gst: "",
     })
 
+    // Header/Footer State
+    const [headerFooterData, setHeaderFooterData] = useState({
+        headerImage: "",
+        footerImage: "",
+        contactInfo: "",
+        showOnAllPages: true,
+    })
+
     // Load data when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -62,24 +77,31 @@ export function ItineraryDetailsModal({
                 email: agencyDetails?.email || "",
                 gst: agencyDetails?.gst || "",
             })
+
+            setHeaderFooterData({
+                headerImage: headerFooter?.headerImage || "",
+                footerImage: headerFooter?.footerImage || "",
+                contactInfo: headerFooter?.contactInfo || "",
+                showOnAllPages: headerFooter?.showOnAllPages !== false,
+            })
         }
-    }, [isOpen, guestDetails, agencyDetails])
+    }, [isOpen, guestDetails, agencyDetails, headerFooter])
 
     const handleSave = () => {
-        onSave(guestData, agencyData)
+        onSave(guestData, agencyData, headerFooterData)
         onClose()
     }
 
-    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'logo' | 'headerImage' | 'footerImage') => {
         const file = e.target.files?.[0]
         if (file) {
-            // In a real app, you'd upload to S3/Cloudinary here.
-            // For now, we'll use a local object URL or base64 placeholder if needed.
-            // Ideally, the parent should handle the actual upload logic or we use a pre-signed URL.
-            // Simulating a "uploaded" URL for now or just using a data URL for preview.
             const reader = new FileReader()
             reader.onloadend = () => {
-                setAgencyData(prev => ({ ...prev, logo: reader.result as string }))
+                if (field === 'logo') {
+                    setAgencyData(prev => ({ ...prev, logo: reader.result as string }))
+                } else {
+                    setHeaderFooterData(prev => ({ ...prev, [field]: reader.result as string }))
+                }
             }
             reader.readAsDataURL(file)
         }
@@ -87,18 +109,19 @@ export function ItineraryDetailsModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Itinerary Details</DialogTitle>
                     <DialogDescription>
-                        Enter the details for the guests and the agency handling this itinerary.
+                        Enter the details for guests, agency, and custom branding.
                     </DialogDescription>
                 </DialogHeader>
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="guest">Guest Details</TabsTrigger>
-                        <TabsTrigger value="agency">Agency Details</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="guest">Guest</TabsTrigger>
+                        <TabsTrigger value="agency">Agency</TabsTrigger>
+                        <TabsTrigger value="headerfooter">Header/Footer</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="guest" className="space-y-4 py-4">
@@ -169,7 +192,7 @@ export function ItineraryDetailsModal({
                                     type="file"
                                     accept="image/*"
                                     className="hidden"
-                                    onChange={handleLogoUpload}
+                                    onChange={(e) => handleImageUpload(e, 'logo')}
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Recommended: Square PNG or JPG, max 2MB</p>
                             </div>
@@ -219,6 +242,87 @@ export function ItineraryDetailsModal({
                                     value={agencyData.gst}
                                     onChange={(e) => setAgencyData({ ...agencyData, gst: e.target.value })}
                                     placeholder="GST Identification Number"
+                                />
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="headerfooter" className="space-y-6 py-4">
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label>Header Image</Label>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative h-16 w-full max-w-[200px] rounded-md border border-dashed flex items-center justify-center overflow-hidden bg-gray-50">
+                                        {headerFooterData.headerImage ? (
+                                            <>
+                                                <img src={headerFooterData.headerImage} alt="Header" className="h-full w-full object-contain" />
+                                                <button
+                                                    onClick={() => setHeaderFooterData(prev => ({ ...prev, headerImage: "" }))}
+                                                    className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl hover:bg-red-600"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <Upload className="h-6 w-6 text-gray-400" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <Label htmlFor="header-image" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2">
+                                            Upload Header
+                                        </Label>
+                                        <Input
+                                            id="header-image"
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleImageUpload(e, 'headerImage')}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label>Footer Image</Label>
+                                <div className="flex items-center gap-4">
+                                    <div className="relative h-16 w-full max-w-[200px] rounded-md border border-dashed flex items-center justify-center overflow-hidden bg-gray-50">
+                                        {headerFooterData.footerImage ? (
+                                            <>
+                                                <img src={headerFooterData.footerImage} alt="Footer" className="h-full w-full object-contain" />
+                                                <button
+                                                    onClick={() => setHeaderFooterData(prev => ({ ...prev, footerImage: "" }))}
+                                                    className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl hover:bg-red-600"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <Upload className="h-6 w-6 text-gray-400" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <Label htmlFor="footer-image" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent h-9 px-4 py-2">
+                                            Upload Footer
+                                        </Label>
+                                        <Input
+                                            id="footer-image"
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => handleImageUpload(e, 'footerImage')}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="contact-info">Footer Contact Info</Label>
+                                <Textarea
+                                    id="contact-info"
+                                    value={headerFooterData.contactInfo}
+                                    onChange={(e) => setHeaderFooterData(prev => ({ ...prev, contactInfo: e.target.value }))}
+                                    placeholder="Enter contact details for the footer..."
+                                    rows={3}
                                 />
                             </div>
                         </div>

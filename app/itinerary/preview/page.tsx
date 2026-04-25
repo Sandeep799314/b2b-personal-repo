@@ -39,6 +39,7 @@ import {
 
 import { MinimalistTemplate } from "@/components/itinerary-builder/previews/minimalist-template"
 import { ClassicTemplate } from "@/components/itinerary-builder/previews/classic-template"
+import LondonItinerary from "@/components/itinerary-builder/previews/new-template"
 
 
 
@@ -618,16 +619,19 @@ export default function ItineraryPreviewPage() {
     // Prefer the ID from the object, but if missing (e.g. new preview), check URL or storage
     let rawId = itinerary?.itineraryId || itinerary?._id
 
-    if (!rawId && typeof window !== "undefined") {
+    // Check for invalid ID strings
+    const isValidId = (id: any) => id && id !== "undefined" && id !== "null" && id !== "";
+
+    if (!isValidId(rawId) && typeof window !== "undefined") {
       // Fallback to what might have been stored during the builder session
       const fallbackId = window.localStorage.getItem("currentItineraryId")
-      if (fallbackId) {
+      if (isValidId(fallbackId)) {
         rawId = fallbackId
       }
     }
 
-    if (rawId) {
-      router.push(`/itinerary/builder?id=${rawId.toString()}&mode=edit&type=${type}`)
+    if (isValidId(rawId)) {
+      router.push(`/itinerary/builder?id=${rawId!.toString()}&mode=edit&type=${type}`)
     } else {
       // If we really don't have an ID, we might be previewing a fresh unsaved state?
       // But typically we should have an ID. If not, just go back to builder base.
@@ -806,6 +810,7 @@ export default function ItineraryPreviewPage() {
               <SelectContent>
                 <SelectItem value="1">Minimalist</SelectItem>
                 <SelectItem value="2">Classic</SelectItem>
+                <SelectItem value="3">Editorial</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -845,7 +850,7 @@ export default function ItineraryPreviewPage() {
 
       <div id="preview-content" className="max-w-5xl mx-auto p-4 space-y-6">
 
-        {selectedTemplate === 1 ? (
+        {selectedTemplate === 1 && (
           <MinimalistTemplate
             itinerary={itinerary}
             showPrices={showPrices}
@@ -854,8 +859,19 @@ export default function ItineraryPreviewPage() {
             currency={pricingCurrency}
             exchangeRates={exchangeRates}
           />
-        ) : (
+        )}
+        {selectedTemplate === 2 && (
           <ClassicTemplate
+            itinerary={itinerary}
+            showPrices={showPrices}
+            showItemizedPrices={showItemizedPrices}
+            isDetailed={isDetailedView}
+            currency={pricingCurrency}
+            exchangeRates={exchangeRates}
+          />
+        )}
+        {selectedTemplate === 3 && (
+          <LondonItinerary
             itinerary={itinerary}
             showPrices={showPrices}
             showItemizedPrices={showItemizedPrices}

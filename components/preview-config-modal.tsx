@@ -59,7 +59,7 @@ export function PreviewConfigModal({ isOpen, onClose, onConfirm }: PreviewConfig
               <Label className="text-base font-medium">Template</Label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => setTemplate(1)}
@@ -68,8 +68,8 @@ export function PreviewConfigModal({ isOpen, onClose, onConfirm }: PreviewConfig
                   : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
-                <div className="font-medium">Minimalist</div>
-                <div className="text-xs text-gray-500">Clean & Simple</div>
+                <div className="font-medium text-xs sm:text-sm">Minimalist</div>
+                <div className="text-[10px] text-gray-500">Clean</div>
               </button>
               <button
                 type="button"
@@ -79,8 +79,19 @@ export function PreviewConfigModal({ isOpen, onClose, onConfirm }: PreviewConfig
                   : 'border-gray-200 hover:border-gray-300'
                   }`}
               >
-                <div className="font-medium">Classic</div>
-                <div className="text-xs text-gray-500">Traditional Style</div>
+                <div className="font-medium text-xs sm:text-sm">Classic</div>
+                <div className="text-[10px] text-gray-500">Standard</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplate(3)}
+                className={`p-3 rounded-lg border-2 text-left transition-all ${template === 3
+                  ? 'border-[#f0c105] bg-[#f0c105]/5 text-[#9A7B00]'
+                  : 'border-gray-200 hover:border-gray-300'
+                  }`}
+              >
+                <div className="font-medium text-xs sm:text-sm">Editorial</div>
+                <div className="text-[10px] text-gray-500">Premium</div>
               </button>
             </div>
           </div>
