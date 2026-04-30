@@ -688,6 +688,10 @@ export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingIte
         toast.success("Item updated successfully")
       } else {
         await createItem(newItem)
+        // Trigger credit deduction animation for new library product
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 1 } }));
+        }
         toast.success("Item created successfully")
       }
 

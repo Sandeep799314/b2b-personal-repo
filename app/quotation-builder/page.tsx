@@ -49,6 +49,7 @@ import {
   Copy
 } from "lucide-react"
 import { DashboardStats } from "@/components/dashboard-stats"
+import { UserWallet } from "@/components/user-wallet"
 
 interface LeadFormData {
   name: string
@@ -186,19 +187,22 @@ export default function QuotationBuilderPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-semibold">Quotation Builder</h1>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="gap-1"
-                  onClick={() => router.push("/itinerary")}
-                >
-                  <Calendar className="h-4 w-4" />
-                  <span>View Itineraries</span>
-                </Button>
-                <Button onClick={handleCreateNew}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Quotation
-                </Button>
+              <div className="flex items-center gap-4">
+                <UserWallet />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-1"
+                    onClick={() => router.push("/itinerary")}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <span>View Itineraries</span>
+                  </Button>
+                  <Button onClick={handleCreateNew}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Quotation
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -242,20 +246,23 @@ export default function QuotationBuilderPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-[50px]">S.No</TableHead>
                           <TableHead>Quotation Title</TableHead>
                           <TableHead>Client</TableHead>
                           <TableHead>Destination</TableHead>
-                          <TableHead>Version</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead>Last Modified</TableHead>
+                          <TableHead>Timeline</TableHead>
                           <TableHead>Total</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Version</TableHead>
                           <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredQuotations.map((quotation) => (
+                        {filteredQuotations.map((quotation, index) => (
                           <TableRow key={quotation._id}>
+                            <TableCell className="text-muted-foreground font-medium">
+                              {index + 1}
+                            </TableCell>
                             <TableCell className="font-medium">
                               <div className="max-w-[180px] truncate" title={quotation.title}>
                                 {quotation.title}
@@ -264,15 +271,14 @@ export default function QuotationBuilderPage() {
                             <TableCell>{quotation.client?.name}</TableCell>
                             <TableCell>{quotation.destination}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="font-mono text-xs">
-                                V{quotation.currentVersion || 1}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {quotation.createdAt ? formatDate(quotation.createdAt) : '-'}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {quotation.updatedAt ? formatDate(quotation.updatedAt) : '-'}
+                              <div className="flex flex-col text-[11px] text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium text-neutral-500">Created:</span> {quotation.createdAt ? formatDate(quotation.createdAt) : '-'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <span className="font-medium text-neutral-500">Modified:</span> {quotation.updatedAt ? formatDate(quotation.updatedAt) : '-'}
+                                </span>
+                              </div>
                             </TableCell>
                             <TableCell className="font-semibold text-brand-700">
                               {formatCurrency(
@@ -282,6 +288,11 @@ export default function QuotationBuilderPage() {
                             </TableCell>
                             <TableCell>
                               <StatusBadge status={quotation.status} />
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4 border-brand-200 text-brand-700 bg-brand-50/30">
+                                V{quotation.currentVersion || 1}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <DropdownMenu>

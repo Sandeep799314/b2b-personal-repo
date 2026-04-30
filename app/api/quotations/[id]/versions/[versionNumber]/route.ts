@@ -42,14 +42,21 @@ export async function PUT(
 
         // Restore the version's state to the quotation
         if (versionData.state) {
-            quotation.days = versionData.state.days || quotation.days
-            quotation.pricingOptions = versionData.state.pricingOptions || quotation.pricingOptions
-            quotation.subtotal = versionData.state.subtotal || quotation.subtotal
-            quotation.markup = versionData.state.markup || quotation.markup
-            quotation.total = versionData.state.total || quotation.total
-            if (versionData.state.currencySettings) {
-                quotation.currencySettings = versionData.state.currencySettings
-            }
+            const fieldsToRestore = [
+                "days", "pricingOptions", "subtotal", "markup", "total",
+                "currencySettings", "title", "description", "countries",
+                "destination", "duration", "totalPrice", "currency", "type",
+                "cartItems", "htmlContent", "htmlBlocks", "serviceSlots",
+                "branding", "gallery", "highlights", "images", "overviewEvents",
+                "notes", "productId", "productReferenceCode"
+            ];
+
+            fieldsToRestore.forEach(field => {
+                if (versionData.state[field] !== undefined) {
+                    quotation[field] = versionData.state[field];
+                    quotation.markModified(field);
+                }
+            });
         }
 
         // Set current version to the restored version

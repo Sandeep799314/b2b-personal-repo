@@ -1,16 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { TopHeader } from "@/components/top-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PriceSettingsDialog } from "@/components/price-settings-dialog"
 import { BrandSettingsDialog } from "@/components/brand-settings-dialog"
-import { DollarSign, Building2 } from "lucide-react"
+import { DollarSign, Building2, Wallet } from "lucide-react"
 
 export default function SettingsPage() {
     const [showPriceSettings, setShowPriceSettings] = useState(false)
     const [showBrandSettings, setShowBrandSettings] = useState(false)
+    const router = useRouter()
 
     return (
         <div className="flex flex-col h-full bg-gradient-to-br from-neutral-50 to-brand-primary-50/30">
@@ -54,6 +56,23 @@ export default function SettingsPage() {
                         <CardContent>
                             <Button onClick={() => setShowBrandSettings(true)} className="w-full">
                                 Configure Brand
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="shadow-brand-sm border-purple-200/60 transition-all hover:shadow-brand-md">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Wallet className="h-5 w-5 text-purple-600" />
+                                Payment & Credits
+                            </CardTitle>
+                            <CardDescription>
+                                Recharge your wallet and manage credit usage.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button onClick={() => router.push("/credits")} className="w-full bg-purple-600 hover:bg-purple-700">
+                                Manage Credits
                             </Button>
                         </CardContent>
                     </Card>

@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useQuotations } from "@/hooks/use-quotations"
 import { getAuthHeaders } from "@/lib/client-auth"
 import { getDefaultImageByString } from "@/lib/constants"
+import { UserWallet } from "./user-wallet"
 
 interface ItineraryListProps {
   onCreateNew: () => void
@@ -29,6 +30,7 @@ interface ItineraryListProps {
   onEditItinerary: (id: string) => void
   onShareItinerary?: (id: string) => void
   viewLoadingId?: string | null
+  selectForQuotation?: boolean
 }
 
 const TYPE_CONFIG = {
@@ -54,7 +56,14 @@ const TYPE_CONFIG = {
   },
 }
 
-export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, onShareItinerary, viewLoadingId }: ItineraryListProps) {
+export function ItineraryList({ 
+  onCreateNew, 
+  onViewItinerary, 
+  onEditItinerary, 
+  onShareItinerary, 
+  viewLoadingId,
+  selectForQuotation: selectForQuotationProp
+}: ItineraryListProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [itineraries, setItineraries] = useState<IItinerary[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,7 +79,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
   const { toast } = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const selectForQuotation = searchParams.get("selectForQuotation") === "true"
+  const selectForQuotation = selectForQuotationProp === true || searchParams.get("selectForQuotation") === "true"
   const { convertItineraryToQuotation, isLoading: isConverting } = useQuotations()
 
   const formatLogDate = (dateInput: Date | string) => {
@@ -181,6 +190,11 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
       )
 
       if (quotationId) {
+        // Trigger credit deduction animation for new quotation
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 1 } }));
+        }
+
         setConvertDialogOpen(false)
         setSelectedItinerary(null)
         router.push(`/quotation-builder/${quotationId}`)
@@ -264,26 +278,31 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
               : "Create and manage your travel itineraries"}
           </p>
         </div>
-        {!selectForQuotation ? (
-          <Button onClick={onCreateNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Itinerary
-          </Button>
-        ) : (
-          <Button variant="outline" onClick={() => router.push("/quotation-builder")}>
-            Cancel
-          </Button>
-        )}
+        <div className="flex items-center gap-4">
+          {!selectForQuotation ? (
+            <Button onClick={onCreateNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Itinerary
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => router.push("/quotation-builder")}>
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="mb-6">
-        <Input
-          type="search"
-          placeholder="Search itineraries..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-sm"
-        />
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
+          <Input
+            type="search"
+            placeholder="Search itineraries..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
@@ -444,7 +463,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                 <CardContent className="flex-1 flex flex-col p-4 pt-0">
                   <div className="space-y-3 flex-1 flex flex-col">
                     {/* Metadata Row */}
-                    <div className="flex items-center justify-between min-h-[24px]">
+                    <div className="flex items-center justify-between min-h-[28px]">
                       <div className="flex items-center gap-2">
                         {itinerary.productReferenceCode && (
                           <div className="text-[9px] font-bold text-brand-600 bg-brand-50/50 px-1.5 py-0.5 rounded border border-brand-100/50 uppercase tracking-wide w-fit">
@@ -462,7 +481,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                       </div>
 
                       {/* Highlights/Tags */}
-                      <div className="flex items-center gap-1 overflow-hidden">
+                      <div className="flex items-center gap-1 overflow-hidden h-4">
                         {itinerary.highlights?.slice(0, 2).map((highlight, idx) => (
                           <Badge 
                             key={idx} 
@@ -476,7 +495,7 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                     </div>
 
                     {/* Description and Price Row */}
-                    <div className="flex justify-between items-start gap-4">
+                    <div className="flex justify-between items-start gap-4 min-h-[60px]">
                       <div className="flex-1 min-w-0">
                         <div className={`${isExpanded ? "min-h-0" : "h-[40px]"} overflow-hidden transition-all duration-300`}>
                           <p className={`text-[12px] text-neutral-600 leading-[1.6] font-medium ${isExpanded ? "" : "line-clamp-2"}`}>
@@ -520,10 +539,13 @@ export function ItineraryList({ onCreateNew, onViewItinerary, onEditItinerary, o
                         <Button
                           variant="default"
                           size="sm"
-                          className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold shadow-sm transition-all active:scale-[0.98]"
-                          onClick={() => handleItinerarySelect(itinerary)}
+                          className="w-full bg-amber-400 hover:bg-amber-500 text-black font-bold shadow-sm transition-all active:scale-[0.98] border-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleItinerarySelect(itinerary);
+                          }}
                         >
-                          Create Quotation
+                          Select for Quotation
                         </Button>
                       ) : (
                         <div className="space-y-2">

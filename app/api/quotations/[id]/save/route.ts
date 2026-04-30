@@ -3,6 +3,38 @@ import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
 
+// Helper to capture a full snapshot of the quotation state
+const snapshotQuotationState = (q: any) => {
+  return {
+    days: q.days || [],
+    pricingOptions: q.pricingOptions || {},
+    subtotal: q.subtotal || 0,
+    markup: q.markup || 0,
+    total: q.total || 0,
+    currencySettings: q.currencySettings || {},
+    title: q.title || "",
+    description: q.description || "",
+    countries: q.countries || [],
+    destination: q.destination || "",
+    duration: q.duration || "",
+    totalPrice: q.totalPrice || 0,
+    currency: q.currency || "USD",
+    type: q.type || "customized-package",
+    cartItems: q.cartItems || [],
+    htmlContent: q.htmlContent || "",
+    htmlBlocks: q.htmlBlocks || [],
+    serviceSlots: q.serviceSlots || [],
+    branding: q.branding || {},
+    gallery: q.gallery || [],
+    highlights: q.highlights || [],
+    images: q.images || [],
+    overviewEvents: q.overviewEvents || [],
+    notes: q.notes || "",
+    productId: q.productId || "",
+    productReferenceCode: q.productReferenceCode || ""
+  }
+}
+
 // POST /api/quotations/[id]/save
 export async function POST(
   request: NextRequest,
@@ -25,7 +57,6 @@ export async function POST(
     try {
       payload = await request.json();
     } catch (e) {
-      // Body might be empty, which is fine, we'll just use existing DB state (fallback to old behavior)
       console.log("No payload provided to save endpoint, using existing DB state");
     }
 
@@ -35,59 +66,50 @@ export async function POST(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
-    // Initialize version history if it doesn't exist (first-time save)
+    // 1. Initialize version history if it doesn't exist
     if (!quotation.versionHistory || quotation.versionHistory.length === 0) {
       console.log(`[QUOTATION SAVE] Initializing version history for quotation ${id}`);
       quotation.currentVersion = 1;
       quotation.versionHistory = [{
         versionNumber: 1,
-        timestamp: new Date(),
+        createdAt: new Date(),
         isDraft: true,
         isLocked: false,
-        state: {
-          days: quotation.days || [],
-          pricingOptions: quotation.pricingOptions || {
-            showIndividualPrices: true,
-            showSubtotals: true,
-            showTotal: true,
-            markupType: "percentage",
-            markupValue: 0,
-            originalTotalPrice: 0,
-            finalTotalPrice: 0
-          },
-          subtotal: quotation.subtotal || 0,
-          markup: quotation.markup || 0,
-          total: quotation.total || 0,
-          currencySettings: quotation.currencySettings
-        }
+        description: "Initial version",
+        state: snapshotQuotationState(quotation)
       }];
     }
 
-    // Get the current version
-    const currentVersion = quotation.currentVersion || 1
-    const versionIndex = quotation.versionHistory?.findIndex(
+    // 2. Capture the state BEFORE applying updates (this belongs to the current version)
+    const stateBeforeUpdate = snapshotQuotationState(quotation)
+
+    // Get the current version index
+    let currentVersion = quotation.currentVersion || 1
+    let versionIndex = quotation.versionHistory?.findIndex(
       (v: any) => v.versionNumber === currentVersion
     )
 
     if (versionIndex === -1) {
-      return NextResponse.json({
-        error: "Current version not found in history",
-        details: `Version ${currentVersion} not found. Available versions: ${quotation.versionHistory?.map((v: any) => v.versionNumber).join(', ')}`
-      }, { status: 404 })
+      // Fallback to latest version if currentVersion not found
+      versionIndex = quotation.versionHistory.length - 1;
+      currentVersion = quotation.versionHistory[versionIndex].versionNumber;
     }
 
-    // If this version is locked, prevent updates
-    if (quotation.versionHistory[versionIndex].isLocked) {
-      return NextResponse.json({ error: "Cannot update a locked version" }, { status: 400 })
-    }
+    // 3. Finalize and LOCK the current version with its current (old) state
+    quotation.versionHistory[versionIndex].state = stateBeforeUpdate
+    quotation.versionHistory[versionIndex].isDraft = false
+    quotation.versionHistory[versionIndex].isLocked = true
+    quotation.versionHistory[versionIndex].createdAt = new Date()
 
-    // Update Quotation Fields from Payload (if provided)
-    // This ensures the "Draft" document is always up to date with the frontend
+    // 4. Update Quotation Fields from Payload
     if (Object.keys(payload).length > 0) {
       const allowedUpdates = [
         "days", "pricingOptions", "client", "currencySettings",
         "subtotal", "markup", "total", "notes", "title", "description",
-        "validUntil", "totalPrice"
+        "validUntil", "totalPrice", "destination", "countries", "duration",
+        "currency", "type", "cartItems", "htmlContent", "htmlBlocks",
+        "serviceSlots", "branding", "gallery", "highlights", "images",
+        "overviewEvents", "productId", "productReferenceCode"
       ];
 
       allowedUpdates.forEach(key => {
@@ -95,33 +117,36 @@ export async function POST(
           quotation[key] = (payload as any)[key];
         }
       });
-
-      // Explicitly recalculate totals if pricingOptions changed but totals weren't provided or mismatch
-      // But usually frontend sends everything. We'll trust the payload for now or add server-side recalc if needed.
     }
 
-    // Update the version state with current values (either from payload update or existing)
-    // capture the object AFTER updates
-    const quotationSnapshot = quotation.toObject()
+    // 5. Capture the state AFTER applying updates (this belongs to the new version)
+    const stateAfterUpdate = snapshotQuotationState(quotation)
 
-    quotation.versionHistory[versionIndex].state = {
-      days: quotationSnapshot.days,
-      pricingOptions: quotationSnapshot.pricingOptions,
-      subtotal: quotationSnapshot.subtotal,
-      markup: quotationSnapshot.markup,
-      total: quotationSnapshot.total,
-      currencySettings: quotationSnapshot.currencySettings
-    }
-    quotation.versionHistory[versionIndex].isDraft = false // "Saved" means it's a checkpoint, but maybe we keep it as draft?
-    // Actually, "Save" usually means "I'm working on this". 
-    // If we mark it not draft, it might look like a "Final" version. 
-    // Checking previous logic: `quotation.isDraft = false`. 
-    // Let's keep it consistent.
+    // 6. Create the NEXT version with the new state
+    const nextVersionNumber = quotation.versionHistory.length + 1
+    quotation.versionHistory.push({
+      versionNumber: nextVersionNumber,
+      createdAt: new Date(),
+      description: `Draft for version ${nextVersionNumber}`,
+      isLocked: false,
+      isDraft: true,
+      state: stateAfterUpdate
+    })
 
-    quotation.isDraft = false
+    // 7. Update top-level current version info
+    quotation.currentVersion = nextVersionNumber
+    quotation.isDraft = true
+    
+    // Mark fields as modified for Mongoose
     quotation.markModified("versionHistory")
     quotation.markModified("days")
     quotation.markModified("pricingOptions")
+    quotation.markModified("cartItems")
+    quotation.markModified("htmlBlocks")
+    quotation.markModified("branding")
+    quotation.markModified("serviceSlots")
+    quotation.markModified("overviewEvents")
+    quotation.markModified("currencySettings")
 
     // Save changes
     await quotation.save()

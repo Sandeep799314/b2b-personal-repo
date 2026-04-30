@@ -2,11 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/mongodb'
 import LibraryItem from '@/models/LibraryItem'
 import LibraryCollection from '@/models/LibraryCollection'
+import User from '@/models/User'
+import { verifyAuth } from '@/lib/server-auth'
 import mongoose from 'mongoose'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     await dbConnect()
+    
+    // Verify authentication
+    const user = await verifyAuth(request);
+    
+    // Build query - Filter by userId or return items with no userId (public/legacy)
+    const query = user ? { 
+      $or: [
+        { userId: user.uid },
+        { userId: { $exists: false } },
+        { userId: null }
+      ]
+    } : {
+      $or: [
+        { userId: { $exists: false } },
+        { userId: null }
+      ]
+    }
 
     const itemsNeedingFix = await LibraryItem.find({ libraryCollection: { $type: 'string' } })
     const fixes = []
@@ -25,9 +44,10 @@ export async function GET() {
       await Promise.all(fixes)
     }
 
-    const items = await LibraryItem.find({}).populate('libraryCollection').sort({ createdAt: -1 })
+    const items = await LibraryItem.find(query).populate('libraryCollection').sort({ createdAt: -1 })
     return NextResponse.json(items)
   } catch (error) {
+    console.error('Error fetching library items:', error)
     return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
   }
 }
@@ -35,6 +55,33 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await dbConnect()
+    
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+
+    // --- CREDIT SYSTEM START ---
+    let userDoc = await User.findOne({ userId: user.uid });
+    if (!userDoc) {
+      userDoc = await User.create({
+        userId: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        credits: 20
+      });
+    }
+
+    const LIBRARY_ITEM_CREDIT_COST = 1;
+    if (userDoc.credits < LIBRARY_ITEM_CREDIT_COST) {
+      return NextResponse.json({ 
+        error: "Insufficient Credits", 
+        message: `Creating a library product costs ${LIBRARY_ITEM_CREDIT_COST} credit. You currently have ${userDoc.credits} credits.` 
+      }, { status: 403 });
+    }
+    // --- CREDIT SYSTEM END ---
+
     const data = await request.json()
     
     // Clean undefined values
@@ -60,8 +107,18 @@ export async function POST(request: NextRequest) {
     }
 
     cleanData.libraryCollection = collectionId // Allow the setter to cast it
+    
+    // Inject user fields
+    cleanData.userId = user.uid;
+    cleanData.userEmail = user.email;
 
     const item = await LibraryItem.create(cleanData)
+    
+    // --- DEDUCT CREDITS ---
+    userDoc.credits -= LIBRARY_ITEM_CREDIT_COST;
+    await userDoc.save();
+    // ----------------------
+
     const populatedItem = await item.populate('libraryCollection')
     return NextResponse.json(populatedItem, { status: 201 })
   } catch (error) {

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
 import Itinerary from "@/models/Itinerary"
+import User from "@/models/User"
 import { verifyAuth } from "@/lib/server-auth"
 
 interface ApiErrorResponse {
@@ -156,6 +157,35 @@ export async function POST(request: NextRequest) {
 
     await connectWithRetry()
 
+    // --- CREDIT SYSTEM START ---
+    // Fetch user and check credits
+    let userDoc = await User.findOne({ userId: user.uid });
+    if (!userDoc) {
+      // Create user if they don't exist yet (first time)
+      userDoc = await User.create({
+        userId: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        credits: 20
+      });
+    } else if (userDoc.credits === undefined || userDoc.credits === null) {
+      userDoc.credits = 20;
+      await userDoc.save();
+    }
+
+    const ITINERARY_CREDIT_COST = 2;
+    if (userDoc.credits < ITINERARY_CREDIT_COST) {
+      return createErrorResponse(
+        "Insufficient Credits",
+        `Creating an itinerary costs ${ITINERARY_CREDIT_COST} credits. You currently have ${userDoc.credits} credits.`,
+        "INSUFFICIENT_CREDITS",
+        403,
+        { currentCredits: userDoc.credits, requiredCredits: ITINERARY_CREDIT_COST },
+        requestId,
+      );
+    }
+    // --- CREDIT SYSTEM END ---
+
     let data: any
     try {
       data = await request.json()
@@ -262,6 +292,11 @@ export async function POST(request: NextRequest) {
 
     await itinerary.save()
     console.log("[v0] Successfully saved itinerary:", itinerary._id)
+
+    // --- DEDUCT CREDITS ---
+    userDoc.credits -= ITINERARY_CREDIT_COST;
+    await userDoc.save();
+    // ----------------------
 
     return NextResponse.json(
       {

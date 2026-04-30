@@ -38,6 +38,7 @@ interface EventCardProps {
   pricingRooms?: number
   pricingCurrency?: string
   pricingMode?: 'individual' | 'total-only'
+  readOnly?: boolean
 }
 
 export function EventCard({
@@ -57,6 +58,7 @@ export function EventCard({
   pricingRooms = 1,
   pricingCurrency = "INR",
   pricingMode = 'individual',
+  readOnly = false,
 }: EventCardProps) {
 
   const renderEventContent = () => {
@@ -190,16 +192,16 @@ export function EventCard({
     <div className="relative">
       <div
         className={`${isDragging ? 'opacity-50' : ''}`}
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        draggable={!readOnly}
+        onDragStart={!readOnly ? onDragStart : undefined}
+        onDragEnd={!readOnly ? onDragEnd : undefined}
       >
         {/* DEBUG MARKER TO VERIFY FILE LOADING */}
         <div className="hidden" data-debug-id="event-card-loaded"></div>
         {renderEventContent()}
       </div>
 
-      {(onEdit || onDelete) && (
+      {!readOnly && (onEdit || onDelete) && (
         <div className="absolute top-2 right-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

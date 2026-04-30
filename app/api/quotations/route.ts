@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
+import User from "@/models/User"
 import { verifyAuth } from "@/lib/server-auth"
 
 // GET /api/quotations
@@ -51,6 +52,29 @@ export async function POST(request: NextRequest) {
     // Connect to database
     await connectDB()
 
+    // --- CREDIT SYSTEM START ---
+    let userDoc = await User.findOne({ userId: user.uid });
+    if (!userDoc) {
+      userDoc = await User.create({
+        userId: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        credits: 20
+      });
+    } else if (userDoc.credits === undefined || userDoc.credits === null) {
+      userDoc.credits = 20;
+      await userDoc.save();
+    }
+
+    const QUOTATION_CREDIT_COST = 1;
+    if (userDoc.credits < QUOTATION_CREDIT_COST) {
+      return NextResponse.json({ 
+        error: "Insufficient Credits", 
+        message: `Creating a product/quotation costs ${QUOTATION_CREDIT_COST} credit. You currently have ${userDoc.credits} credits.` 
+      }, { status: 403 });
+    }
+    // --- CREDIT SYSTEM END ---
+
     // Parse request body
     const quotationData = await request.json()
 
@@ -65,6 +89,11 @@ export async function POST(request: NextRequest) {
     // Create new quotation
     const quotation = new Quotation(dataWithUser)
     await quotation.save()
+
+    // --- DEDUCT CREDITS ---
+    userDoc.credits -= QUOTATION_CREDIT_COST;
+    await userDoc.save();
+    // ----------------------
 
     return NextResponse.json({
       message: "Quotation created successfully",

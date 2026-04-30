@@ -4,6 +4,38 @@ import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
 import { recalculateQuotationTotals } from "@/lib/pricing-utils"
 
+// Helper to capture a full snapshot of the quotation state
+const snapshotQuotationState = (q: any) => {
+  return {
+    days: q.days || [],
+    pricingOptions: q.pricingOptions || {},
+    subtotal: q.subtotal || 0,
+    markup: q.markup || 0,
+    total: q.total || 0,
+    currencySettings: q.currencySettings || {},
+    title: q.title || "",
+    description: q.description || "",
+    countries: q.countries || [],
+    destination: q.destination || "",
+    duration: q.duration || "",
+    totalPrice: q.totalPrice || 0,
+    currency: q.currency || "USD",
+    type: q.type || "customized-package",
+    cartItems: q.cartItems || [],
+    htmlContent: q.htmlContent || "",
+    htmlBlocks: q.htmlBlocks || [],
+    serviceSlots: q.serviceSlots || [],
+    branding: q.branding || {},
+    gallery: q.gallery || [],
+    highlights: q.highlights || [],
+    images: q.images || [],
+    overviewEvents: q.overviewEvents || [],
+    notes: q.notes || "",
+    productId: q.productId || "",
+    productReferenceCode: q.productReferenceCode || ""
+  }
+}
+
 // GET /api/quotations/[id]
 export async function GET(
   request: NextRequest,
@@ -85,18 +117,6 @@ export async function PUT(
       quotation.versionHistory = []
     }
 
-    const getSnapshotState = () => {
-      const quotationSnapshot = quotation.toObject()
-      return {
-        days: quotationSnapshot.days,
-        pricingOptions: quotationSnapshot.pricingOptions,
-        subtotal: quotationSnapshot.subtotal,
-        markup: quotationSnapshot.markup,
-        total: quotationSnapshot.total,
-        currencySettings: quotationSnapshot.currencySettings
-      }
-    }
-
     const currentVersion = quotation.currentVersion || 1
     let versionIndex = quotation.versionHistory.findIndex(
       (v: any) => v.versionNumber === currentVersion
@@ -120,7 +140,7 @@ export async function PUT(
         description: versionDescription || "Auto-created draft version",
         isLocked: false,
         isDraft: true,
-        state: getSnapshotState()
+        state: snapshotQuotationState(quotation)
       })
       quotation.currentVersion = fallbackVersion
       versionIndex = quotation.versionHistory.length - 1
@@ -135,7 +155,7 @@ export async function PUT(
         description: versionDescription || "Draft created from locked version",
         isLocked: false,
         isDraft: true,
-        state: getSnapshotState()
+        state: snapshotQuotationState(quotation)
       })
       quotation.currentVersion = newVersionNumber
       quotation.isLocked = false

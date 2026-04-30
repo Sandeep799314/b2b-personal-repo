@@ -69,6 +69,7 @@ import { useRouter } from "next/navigation"
 import { calculateComponentPrice, calculateTotalPrice, PricingConfig } from "@/lib/pricing-calculator"
 import { QuotationPricingControls } from "@/components/quotation-pricing-controls"
 import { QuotationPricingOptions } from "@/models/Quotation"
+import { UserWallet } from "../user-wallet"
 
 // Country options removed
 
@@ -77,9 +78,29 @@ interface ItineraryBuilderProps {
   quotationId?: string
   mode?: "itinerary" | "quotation"
   onBack: () => void
-  onSave?: () => Promise<void>
+  onSave?: (data?: any) => Promise<void>
   extraActions?: React.ReactNode
   onHasChangesChange?: (hasChanges: boolean) => void
+  readOnly?: boolean
+  initialDays?: IItineraryDay[]
+  initialPricingOptions?: QuotationPricingOptions
+  initialTitle?: string
+  initialDescription?: string
+  initialCountries?: string[]
+  initialProductReferenceCode?: string
+  initialProductId?: string
+  initialBranding?: any
+  initialGallery?: IGalleryItem[]
+  initialOverviewEvents?: IItineraryEvent[]
+  initialServiceSlots?: any[]
+  initialNotes?: string
+  initialHighlights?: string[]
+  initialImages?: string[]
+  initialType?: string
+  initialCartItems?: any[]
+  initialHtmlContent?: string
+  initialHtmlBlocks?: any[]
+  hideWallet?: boolean
 }
 
 const EMPTY_DAY: IItineraryDay = {
@@ -182,7 +203,7 @@ const COMPONENT_TEMPLATES = [
 ]
 
 export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
-  ({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions, onHasChangesChange }, ref) => {
+  ({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions, onHasChangesChange, readOnly = false, initialDays, initialPricingOptions, initialTitle, initialDescription, initialCountries, initialProductReferenceCode, initialProductId, initialBranding, initialGallery, initialOverviewEvents, initialServiceSlots, initialNotes, initialHighlights, initialImages, initialType, initialCartItems, initialHtmlContent, initialHtmlBlocks, hideWallet = false }, ref) => {
   // library items disabled in this builder
   const { createItinerary, updateItinerary } = useItineraries()
   const { toast } = useToast()
@@ -193,13 +214,126 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const [currentItineraryId, setCurrentItineraryId] = useState<string | null>(itineraryId || null)
 
   // All state declarations in one place
-  const [days, setDays] = useState<IItineraryDay[]>([{ ...EMPTY_DAY, events: [] }])
-  const [title, setTitle] = useState("New Itinerary")
-  const [description, setDescription] = useState("")
+  const [days, setDays] = useState<IItineraryDay[]>(initialDays || [{ ...EMPTY_DAY, events: [] }])
+  
+  // Sync state when initial props change (e.g. version change)
+  useEffect(() => {
+    if (initialDays && initialDays.length > 0) {
+      setDays(initialDays)
+      // When switching versions in quotation mode, reset initial load flag
+      // so that other effects don't think we're still loading
+      isInitialLoad.current = false
+      setHasChanges(false)
+    }
+  }, [initialDays])
+
+  useEffect(() => {
+    if (initialPricingOptions) {
+      setQuotationPricingOptions(initialPricingOptions)
+    }
+  }, [initialPricingOptions])
+
+  useEffect(() => {
+    if (initialTitle !== undefined) {
+      setTitle(initialTitle || "")
+    }
+  }, [initialTitle])
+
+  useEffect(() => {
+    if (initialDescription !== undefined) {
+      setDescription(initialDescription || "")
+    }
+  }, [initialDescription])
+
+  useEffect(() => {
+    if (initialCountries !== undefined) {
+      setCountries(initialCountries || [])
+    }
+  }, [initialCountries])
+
+  useEffect(() => {
+    if (initialProductReferenceCode !== undefined) {
+      setProductReferenceCode(initialProductReferenceCode || "")
+    }
+  }, [initialProductReferenceCode])
+
+  useEffect(() => {
+    if (initialProductId !== undefined) {
+      setProductId(initialProductId || "")
+    }
+  }, [initialProductId])
+
+  useEffect(() => {
+    if (initialBranding !== undefined) {
+      setBranding(initialBranding || {})
+    }
+  }, [initialBranding])
+
+  useEffect(() => {
+    if (initialGallery !== undefined) {
+      setGallery(initialGallery || [])
+    }
+  }, [initialGallery])
+
+  useEffect(() => {
+    if (initialOverviewEvents !== undefined) {
+      setOverviewEvents(initialOverviewEvents || [])
+    }
+  }, [initialOverviewEvents])
+
+  useEffect(() => {
+    if (initialServiceSlots !== undefined) {
+      setServiceSlots(initialServiceSlots || [])
+    }
+  }, [initialServiceSlots])
+
+  useEffect(() => {
+    if (initialNotes !== undefined) {
+      setNotes(initialNotes || "")
+    }
+  }, [initialNotes])
+
+  useEffect(() => {
+    if (initialHighlights !== undefined) {
+      setHighlights(initialHighlights || [])
+    }
+  }, [initialHighlights])
+
+  useEffect(() => {
+    if (initialImages !== undefined) {
+      setImages(initialImages || [])
+    }
+  }, [initialImages])
+
+  useEffect(() => {
+    if (initialType !== undefined) {
+      setItineraryType(initialType || "customized-package")
+    }
+  }, [initialType])
+
+  useEffect(() => {
+    if (initialCartItems !== undefined) {
+      setCartItems(initialCartItems || [])
+    }
+  }, [initialCartItems])
+
+  useEffect(() => {
+    if (initialHtmlContent !== undefined) {
+      setHtmlContent(initialHtmlContent || "")
+    }
+  }, [initialHtmlContent])
+
+  useEffect(() => {
+    if (initialHtmlBlocks !== undefined) {
+      setHtmlBlocks(initialHtmlBlocks || [])
+    }
+  }, [initialHtmlBlocks])
+  const [title, setTitle] = useState(initialTitle || "New Itinerary")
+  const [description, setDescription] = useState(initialDescription || "")
   const [isDetailedView, setIsDetailedView] = useState(true)
   const [showDates, setShowDates] = useState(true)
-  const [serviceSlots, setServiceSlots] = useState<Array<{ id: string; title: string; events: IItineraryEvent[] }>>([])
-  const [overviewEvents, setOverviewEvents] = useState<IItineraryEvent[]>([])
+  const [serviceSlots, setServiceSlots] = useState<Array<{ id: string; title: string; events: IItineraryEvent[] }>>(initialServiceSlots || [])
+  const [overviewEvents, setOverviewEvents] = useState<IItineraryEvent[]>(initialOverviewEvents || [])
 
   const [editingEvent, setEditingEvent] = useState<{
     event: IItineraryEvent
@@ -207,25 +341,11 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     eventIndex: number
   } | null>(null)
   const [productId, setProductId] = useState(`ITN-${Date.now().toString(36).toUpperCase()}`)
-  const [productReferenceCode, setProductReferenceCode] = useState("")
-  const [branding, setBranding] = useState<{
-    logo?: string
-    companyName?: string
-    contactEmail?: string
-    contactPhone?: string
-    address?: string
-    socialLinks?: {
-      instagram?: string
-      whatsapp?: string
-      facebook?: string
-      twitter?: string
-      youtube?: string
-      website?: string
-    }
-  }>({})
-  const [countries, setCountries] = useState<string[]>([])
+  const [productReferenceCode, setProductReferenceCode] = useState(initialProductReferenceCode || "")
+  const [branding, setBranding] = useState<any>(initialBranding || {})
+  const [countries, setCountries] = useState<string[]>(initialCountries || [])
   const [countryError, setCountryError] = useState<string>("")
-  const [gallery, setGallery] = useState<IGalleryItem[]>([])
+  const [gallery, setGallery] = useState<IGalleryItem[]>(initialGallery || [])
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set())
 
   // Pricing toggle & modal state
@@ -298,6 +418,13 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   // Markup state
   const [markupType, setMarkupType] = useState<"percentage" | "amount">("amount")
   const [markupValue, setMarkupValue] = useState<number>(0)
+  const [itineraryType, setItineraryType] = useState<string>(initialType || itineraryTypeParam || "customized-package")
+  const [cartItems, setCartItems] = useState<any[]>(initialCartItems || [])
+  const [htmlContent, setHtmlContent] = useState<string>(initialHtmlContent || "")
+  const [htmlBlocks, setHtmlBlocks] = useState<any[]>(initialHtmlBlocks || [])
+  const [notes, setNotes] = useState<string>(initialNotes || "")
+  const [highlights, setHighlights] = useState<string[]>(initialHighlights || [])
+  const [images, setImages] = useState<string[]>(initialImages || [])
 
   useImperativeHandle(ref, () => ({
     save: handleSave,
@@ -306,6 +433,87 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }))
   const [showExitConfirm, setShowExitConfirm] = useState(false)
   const isInitialLoad = useRef(true)
+
+  // Chatbot event listeners
+  useEffect(() => {
+    const handleChatbotAddEvent = (e: any) => {
+      const { dayIndex, eventData } = e.detail;
+      console.log("[DEBUG] Chatbot adding event to day:", dayIndex, eventData);
+      
+      if (dayIndex < 0 || dayIndex >= days.length) {
+        console.error("Invalid day index for chatbot event");
+        return;
+      }
+
+      const newDays = [...days];
+      const newEvent = {
+        id: `event-${Date.now()}`,
+        ...eventData,
+        componentSource: "manual",
+        versionHistory: [
+          {
+            timestamp: new Date(),
+            action: "created",
+            source: "chatbot",
+          },
+        ],
+      };
+
+      newDays[dayIndex].events = [...newDays[dayIndex].events, newEvent];
+      setDays(newDays);
+      setHasChanges(true);
+      if (onHasChangesChange) onHasChangesChange(true);
+      
+      // Auto-save after AI addition if we have an itineraryId
+      if (currentItineraryId) {
+        autoSave(newDays);
+      }
+
+      toast({
+        title: "Event Added",
+        description: `${eventData.title} added to Day ${dayIndex + 1} by AI Assistant`,
+      });
+    };
+
+    const handleChatbotUpdateTitle = (e: any) => {
+      const { title: newTitle } = e.detail;
+      if (newTitle) {
+        setTitle(newTitle);
+        setHasChanges(true);
+        if (onHasChangesChange) onHasChangesChange(true);
+        toast({
+          title: "Title Updated",
+          description: `Itinerary title changed to "${newTitle}"`,
+        });
+      }
+    };
+
+    const handleChatbotSave = async (e: any) => {
+      const { exitAfterSave } = e.detail || {};
+      await handleSave();
+      if (exitAfterSave && onBack) {
+        onBack();
+      }
+    };
+
+    const handleChatbotExit = () => {
+      if (onBack) {
+        onBack();
+      }
+    };
+
+    window.addEventListener("chatbot-add-event", handleChatbotAddEvent)
+    window.addEventListener("chatbot-update-title", handleChatbotUpdateTitle)
+    window.addEventListener("chatbot-save", handleChatbotSave)
+    window.addEventListener("chatbot-exit", handleChatbotExit)
+    
+    return () => {
+      window.removeEventListener("chatbot-add-event", handleChatbotAddEvent)
+      window.removeEventListener("chatbot-update-title", handleChatbotUpdateTitle)
+      window.removeEventListener("chatbot-save", handleChatbotSave)
+      window.removeEventListener("chatbot-exit", handleChatbotExit)
+    }
+  }, [days, onHasChangesChange, title, currentItineraryId, onBack])
 
   // Browser-level navigation guard
   useEffect(() => {
@@ -316,12 +524,21 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
       }
     }
     window.addEventListener("beforeunload", handleBeforeUnload)
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload)
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+    }
   }, [hasChanges])
 
   // Load existing itinerary data when editing
   useEffect(() => {
     const loadItineraryData = async () => {
+      // If we're in quotation mode and have initialDays, skip internal fetch
+      if (mode === "quotation" && initialDays && initialDays.length > 0) {
+        console.log("[DEBUG] Quotation mode with initialDays, skipping internal fetch")
+        isInitialLoad.current = false
+        return
+      }
+
       if (itineraryId) {
         // Skip if we already have this itinerary loaded (e.g. after a save)
         if (currentItineraryId === itineraryId && !isInitialLoad.current) {
@@ -404,6 +621,13 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             setGuestDetails(itineraryData.guestDetails || {})
             setAgencyDetails(itineraryData.agencyDetails || {})
             setHeaderFooter(itineraryData.headerFooter || {})
+            setItineraryType(itineraryData.type || "customized-package")
+            setCartItems(itineraryData.cartItems || [])
+            setHtmlContent(itineraryData.htmlContent || "")
+            setHtmlBlocks(itineraryData.htmlBlocks || [])
+            setNotes(itineraryData.notes || "")
+            setHighlights(itineraryData.highlights || [])
+            setImages(itineraryData.images || [])
 
             console.log("[v0] Loaded itinerary data for editing:", itineraryData)
             
@@ -1725,8 +1949,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             })),
           }
         }),
-        highlights: extractHighlights(),
-        images: extractImages(),
+        highlights: highlights.length > 0 ? highlights : extractHighlights(),
+        images: images.length > 0 ? images : extractImages(),
         gallery, // Include gallery in save data
         branding,
         serviceSlots,
@@ -1734,6 +1958,11 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         guestDetails,
         agencyDetails,
         headerFooter,
+        type: itineraryType,
+        cartItems,
+        htmlContent,
+        htmlBlocks,
+        notes,
       }
 
       console.log("[v0] Saving itinerary data:", itineraryData)
@@ -1774,6 +2003,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         result = await updateItinerary(effectiveItineraryId, itineraryData)
       } else {
         result = await createItinerary(itineraryData)
+        // Trigger credit deduction animation for new itinerary
+        if (typeof window !== 'undefined' && result) {
+          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 2 } }));
+        }
       }
 
       if (result) {
@@ -1792,18 +2025,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
         // Call the onSave callback if provided
         if (onSave) {
-          // Pass back the quotation pricing options if in quotation mode
-          // We cast to any because the interface was defined as () => Promise<void>
-          // We will update the interface next or just rely on runtime for now (better to update interface)
+          // Pass back the complete itinerary data including quotation options
           await (onSave as any)({
             itineraryId: savedId,
             quotationOptions: mode === 'quotation' ? quotationPricingOptions : undefined,
-            days: days
+            ...itineraryData
           })
         }
         // Reset changes tracking after successful save
         setHasChanges(false)
         setShowSaved(true)
+        
+        // Trigger credit refresh event
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('refresh-credits'));
+        }
+
         setTimeout(() => setShowSaved(false), 2000)
       }
     } catch (error) {
@@ -2028,21 +2265,23 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           <h1 className="text-sm font-bold text-neutral-800 truncate max-w-[180px]">{title || "Untitled Itinerary"}</h1>
         </div>
         <div className="flex items-center gap-2">
-           <Button 
-            onClick={handleSave} 
-            disabled={isSaving}
-            size="sm"
-            className={`${showSaved ? 'bg-green-600' : 'bg-[#2D7CEA]'} text-white rounded-full px-4 h-8 text-xs font-bold shadow-lg shadow-blue-500/20`}
-          >
-            {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : showSaved ? <Check className="h-3 w-3 mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
-            {isSaving ? "..." : showSaved ? "Saved" : "Save"}
-          </Button>
+           {!readOnly && (
+             <Button 
+              onClick={handleSave} 
+              disabled={isSaving}
+              size="sm"
+              className={`${showSaved ? 'bg-green-600' : 'bg-[#2D7CEA]'} text-white rounded-full px-4 h-8 text-xs font-bold shadow-lg shadow-blue-500/20`}
+            >
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : showSaved ? <Check className="h-3 w-3 mr-1.5" /> : <Save className="h-3 w-3 mr-1.5" />}
+              {isSaving ? "..." : showSaved ? "Saved" : "Save"}
+            </Button>
+           )}
         </div>
       </div>
       {/* Vertical EDITOR MODE strip for customized-package - Hidden on Mobile */}
       {(itineraryTypeParam === 'customized-package' && (isNewMode || currentItineraryId)) && (
         <div
-          className="hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40"
+          className={`hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40 ${readOnly ? 'grayscale opacity-50' : ''}`}
           style={{
             background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
           }}
@@ -2056,62 +2295,64 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               letterSpacing: '0.15em'
             }}
           >
-            Editor Mode
+            {readOnly ? 'View Mode' : 'Editor Mode'}
           </span>
         </div>
       )}
 
       {/* Floating Mobile Action Bar - ONLY visible on mobile */}
-      <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-2xl border border-white/10 ring-1 ring-black/5">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={addDay}
-          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
-        >
-          <Plus className="h-5 w-5" />
-        </Button>
-        <div className="w-px h-6 bg-white/20 mx-1" />
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={handlePreview}
-          disabled={isGeneratingPreview}
-          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
-        >
-          {isGeneratingPreview ? <Loader2 className="h-5 w-5 animate-spin" /> : <Eye className="h-5 w-5" />}
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => setMobileSidebarOpen(true)}
-          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
-        >
-          <LayoutGrid className="h-5 w-5" />
-        </Button>
-        <div className="w-px h-6 bg-white/20 mx-1" />
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={handleCreateCopy}
-          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
-        >
-          <Copy className="h-5 w-5" />
-        </Button>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
-        >
-          <Share2 className="h-5 w-5" />
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-2xl border border-white/10 ring-1 ring-black/5">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={addDay}
+            className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
+          <div className="w-px h-6 bg-white/20 mx-1" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handlePreview}
+            disabled={isGeneratingPreview}
+            className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+          >
+            {isGeneratingPreview ? <Loader2 className="h-5 w-5 animate-spin" /> : <Eye className="h-5 w-5" />}
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setMobileSidebarOpen(true)}
+            className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+          >
+            <LayoutGrid className="h-5 w-5" />
+          </Button>
+          <div className="w-px h-6 bg-white/20 mx-1" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleCreateCopy}
+            className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+          >
+            <Copy className="h-5 w-5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white hover:bg-white/10 h-10 w-10 rounded-full transition-transform active:scale-90"
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       <div className="flex-1 p-2 lg:p-4 overflow-y-auto h-full bg-[#f8fafc] pb-24 lg:pb-4">
         {/* Professional Header Card */}
         <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-neutral-200 mb-4 lg:mb-6 p-4 lg:p-6 relative overflow-hidden">
           {/* Subtle Top Accent */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 to-yellow-500" />
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${readOnly ? 'from-neutral-400 to-neutral-500' : 'from-amber-400 to-yellow-500'}`} />
 
           <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 lg:gap-6 mb-4 lg:mb-8">
             <div className="flex-1 space-y-3 lg:space-y-4">
@@ -2120,14 +2361,15 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
+                  readOnly={readOnly}
                   placeholder="Itinerary Title"
-                  className="w-full text-xl lg:text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all"
+                  className={`w-full text-xl lg:text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all ${readOnly ? 'cursor-default' : ''}`}
                   style={{ fontWeight: 900 }}
                   aria-label="Itinerary title"
                   type="text"
                   spellCheck={false}
                 />
-                <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-amber-400 transition-colors" />
+                {!readOnly && <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-amber-400 transition-colors" />}
               </div>
 
               {/* Days & Nights Badge Bar */}
@@ -2146,20 +2388,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             </div>
 
             <div className="hidden lg:flex items-center gap-3 shrink-0">
-              <Button 
-                onClick={handleSave} 
-                disabled={isSaving}
-                className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
-              >
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : showSaved ? (
-                  <Check className="mr-2 h-4 w-4" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
-              </Button>
+              {!readOnly && (
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                  className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
+                >
+                  {isSaving ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : showSaved ? (
+                    <Check className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Save className="mr-2 h-4 w-4" />
+                  )}
+                  {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -2168,15 +2412,16 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             <div className="lg:col-span-8 space-y-4 lg:space-y-6">
               {/* Destination & Reference Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
-                <div className="bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+                <div className={`bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
                   <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
-                    Destination <span className="text-red-500">*</span>
+                    Destination {!readOnly && <span className="text-red-500">*</span>}
                   </label>
                   <div className="flex items-center gap-2">
                     <MapPin className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-amber-500" />
                     <Input
                       value={countries[0] || ""}
                       onChange={(e) => setCountries([e.target.value])}
+                      readOnly={readOnly}
                       className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
                       placeholder="Where to?"
                       autoComplete="off"
@@ -2184,7 +2429,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                   </div>
                 </div>
 
-                <div className="bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+                <div className={`bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
                   <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
                     Product Reference
                   </label>
@@ -2193,6 +2438,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                     <Input
                       value={productReferenceCode}
                       onChange={(e) => setProductReferenceCode(e.target.value)}
+                      readOnly={readOnly}
                       placeholder="Optional Code"
                       className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
                       aria-label="Product Reference Code"
@@ -2202,9 +2448,9 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               </div>
 
               {/* Description Box */}
-              <div className="bg-neutral-50 rounded-xl p-3 lg:p-4 border border-neutral-100 focus-within:border-amber-200 focus-within:bg-white transition-all">
+              <div className={`bg-neutral-50 rounded-xl p-3 lg:p-4 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
                 <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 lg:mb-2 block">
-                  Itinerary Description <span className="text-red-500">*</span>
+                  Itinerary Description {!readOnly && <span className="text-red-500">*</span>}
                 </label>
                 {(() => {
                   const lines = description ? description.split('\n').length : 1
@@ -2213,6 +2459,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                     <Textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      readOnly={readOnly}
                       placeholder="Describe the journey experience..."
                       rows={rows}
                       className="min-h-[50px] lg:min-h-[60px] border-none resize-none p-0 text-sm lg:text-base bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700"
@@ -2245,16 +2492,16 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       <Badge
                         key={highlight}
                         variant="outline"
-                        className={`cursor-pointer text-[10px] lg:text-[11px] py-0.5 lg:py-1 px-2 lg:px-2.5 rounded-lg transition-all border shadow-sm ${
+                        className={`text-[10px] lg:text-[11px] py-0.5 lg:py-1 px-2 lg:px-2.5 rounded-lg transition-all border shadow-sm ${
                           isActive
-                            ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600'
-                            : 'bg-white text-neutral-600 border-neutral-200 hover:border-amber-300 hover:bg-amber-50'
-                        }`}
-                        onClick={() => toggleHighlight(highlight)}
-                        role="button"
-                        tabIndex={0}
+                            ? 'bg-amber-500 text-white border-amber-600'
+                            : 'bg-white text-neutral-600 border-neutral-200'
+                        } ${!readOnly ? 'cursor-pointer hover:border-amber-300 hover:bg-amber-50' : 'cursor-default'}`}
+                        onClick={() => !readOnly && toggleHighlight(highlight)}
+                        role={!readOnly ? "button" : "presentation"}
+                        tabIndex={!readOnly ? 0 : -1}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
+                          if (!readOnly && (e.key === 'Enter' || e.key === ' ')) {
                             e.preventDefault()
                             toggleHighlight(highlight)
                           }
@@ -2266,38 +2513,40 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                   })}
                 </div>
 
-                <div className="mt-auto pt-3 lg:pt-4 border-t border-neutral-50">
-                  <div className="relative group">
-                    <Input
-                      type="text"
-                      placeholder="Add custom highlight..."
-                      value={newHighlight}
-                      onChange={(e) => setNewHighlight(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newHighlight.trim()) {
-                          e.preventDefault()
-                          addHighlight(newHighlight.trim())
-                        }
-                      }}
-                      className="w-full pr-10 lg:pr-12 h-9 lg:h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-amber-300 rounded-lg lg:rounded-xl text-xs lg:text-sm"
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        if (newHighlight.trim()) {
-                          addHighlight(newHighlight.trim())
-                        }
-                      }}
-                      className="absolute right-1 top-1 lg:right-1.5 lg:top-1.5 h-7 w-7 lg:h-8 lg:w-8 p-0 text-amber-600 hover:bg-amber-50"
-                    >
-                      <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                    </Button>
+                {!readOnly && (
+                  <div className="mt-auto pt-3 lg:pt-4 border-t border-neutral-50">
+                    <div className="relative group">
+                      <Input
+                        type="text"
+                        placeholder="Add custom highlight..."
+                        value={newHighlight}
+                        onChange={(e) => setNewHighlight(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newHighlight.trim()) {
+                            e.preventDefault()
+                            addHighlight(newHighlight.trim())
+                          }
+                        }}
+                        className="w-full pr-10 lg:pr-12 h-9 lg:h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-amber-300 rounded-lg lg:rounded-xl text-xs lg:text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (newHighlight.trim()) {
+                            addHighlight(newHighlight.trim())
+                          }
+                        }}
+                        className="absolute right-1 top-1 lg:right-1.5 lg:top-1.5 h-7 w-7 lg:h-8 lg:w-8 p-0 text-amber-600 hover:bg-amber-50"
+                      >
+                        <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-[9px] lg:text-[10px] text-neutral-400 mt-1.5 lg:mt-2 text-center">
+                      Press Enter to quickly add a new tag
+                    </p>
                   </div>
-                  <p className="text-[9px] lg:text-[10px] text-neutral-400 mt-1.5 lg:mt-2 text-center">
-                    Press Enter to quickly add a new tag
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -2355,50 +2604,52 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               </div>
               <div className="flex items-center gap-2">
                 <Switch id="pricing-v" checked={pricingEnabled} onCheckedChange={(v) => {
+                  if (readOnly) return
                   setPricingEnabled(Boolean(v))
                   if (v) setPricingDialogOpen(true)
-                }} className="scale-75" />
-                <label htmlFor="pricing-v" className="text-[10px] font-bold text-black uppercase">Pricing</label>
+                }} className="scale-75" disabled={readOnly} />
+                <label htmlFor="pricing-v" className={`text-[10px] font-bold uppercase ${readOnly ? 'text-neutral-400' : 'text-black'}`}>Pricing</label>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 lg:gap-2 ml-4">
-            <select
-              value={pricingCurrency}
-              onChange={(e) => {
-                const newCurrency = e.target.value
-                setPricingCurrency(newCurrency)
-                if (mode === 'quotation') {
-                  setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
-                }
-              }}
-              className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
-            >
-              <option value="INR">₹ INR</option>
-              <option value="USD">$ USD</option>
-              <option value="EUR">€ EUR</option>
-              <option value="GBP">£ GBP</option>
-              <option value="AED">د.إ AED</option>
-            </select>
-            <Button variant="ghost" size="icon" onClick={handleCreateCopy} disabled={isSaving} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Copy Itinerary">
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Preview Itinerary">
-              {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-            </Button>
-            <div className="w-px h-4 bg-neutral-200 mx-1" />
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Share">
-              <Share2 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Download PDF">
-              <Download className="h-4 w-4" />
-            </Button>
+          {!readOnly && (
+            <div className="flex items-center gap-1.5 lg:gap-2 ml-4">
+              <select
+                value={pricingCurrency}
+                onChange={(e) => {
+                  const newCurrency = e.target.value
+                  setPricingCurrency(newCurrency)
+                  if (mode === 'quotation') {
+                    setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
+                  }
+                }}
+                className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
+              >
+                <option value="INR">₹ INR</option>
+                <option value="USD">$ USD</option>
+                <option value="EUR">€ EUR</option>
+                <option value="GBP">£ GBP</option>
+                <option value="AED">د.إ AED</option>
+              </select>
+              <Button variant="ghost" size="icon" onClick={handleCreateCopy} disabled={isSaving} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Copy Itinerary">
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Preview Itinerary">
+                {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+              </Button>
+              <div className="w-px h-4 bg-neutral-200 mx-1" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Share">
+                <Share2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Download PDF">
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           </div>
-        </div>
 
-        {/* Pricing Info Display Row */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
+          {/* Pricing Info Display Row */}        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
           <div className="flex items-center gap-4 lg:gap-6 min-w-max">
             {/* Pax & Room Info */}
             <div className="flex items-center gap-2 p-1 bg-neutral-100/50 rounded-xl px-3 h-9">
@@ -2702,18 +2953,20 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             {days.map((day, dayIndex) => (
               <Card
                 key={`day-${dayIndex}-${day.day}`}
-                className={`relative border-2 ${dropTarget?.dayIndex === dayIndex ? "border-blue-400" : "border-gray-200"} overflow-hidden rounded-xl shadow-sm`}
+                className={`relative border-2 ${!readOnly && dropTarget?.dayIndex === dayIndex ? "border-blue-400" : "border-gray-200"} overflow-hidden rounded-xl shadow-sm`}
                 onDragOver={(e) => {
+                  if (readOnly) return
                   e.preventDefault()
                   handleDragOver(dayIndex, day.events.length)
                 }}
-                onDrop={() => handleDrop(dayIndex, day.events.length)}
+                onDrop={() => !readOnly && handleDrop(dayIndex, day.events.length)}
               >
                 <CardHeader className="pb-2 pt-3 px-3 lg:px-4 bg-gray-50/50 border-b border-gray-100">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <DayTitle
                       day={day.day}
                       title={day.title}
+                      readOnly={readOnly}
                       onTitleChange={(newTitle) => updateDayTitle(dayIndex, newTitle)}
                     />
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
@@ -2754,7 +3007,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                         <Button variant="ghost" size="sm" onClick={() => setIsDetailedView(!isDetailedView)} className="h-8 w-8 p-0">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        {days.length > 1 && (
+                        {!readOnly && days.length > 1 && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2789,9 +3042,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                           pricingCurrency={pricingCurrency}
                           pricingRooms={pricingRooms}
                           pricingMode={pricingMode}
-                          onDragStart={() => handleDragStart("event", event, dayIndex, eventIndex)}
-                          onEdit={() => handleEditEvent(dayIndex, eventIndex)}
-                          onDelete={() => handleDeleteEvent(dayIndex, eventIndex)}
+                          readOnly={readOnly}
+                          onDragStart={() => !readOnly && handleDragStart("event", event, dayIndex, eventIndex)}
+                          onEdit={() => !readOnly && handleEditEvent(dayIndex, eventIndex)}
+                          onDelete={() => !readOnly && handleDeleteEvent(dayIndex, eventIndex)}
                         />
                       ))}
                     </div>

@@ -336,6 +336,10 @@ export function AddEditEventModal({ isOpen, onClose, item, day, isLibraryMode = 
         toast.success("Item updated successfully")
       } else {
         await createItem(itemData)
+        // Trigger credit deduction animation
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 1 } }));
+        }
         toast.success("Item created successfully")
       }
 

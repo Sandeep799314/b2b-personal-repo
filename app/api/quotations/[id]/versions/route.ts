@@ -3,6 +3,38 @@ import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
 
+// Helper to capture a full snapshot of the quotation state
+const snapshotQuotationState = (q: any) => {
+  return {
+    days: q.days || [],
+    pricingOptions: q.pricingOptions || {},
+    subtotal: q.subtotal || 0,
+    markup: q.markup || 0,
+    total: q.total || 0,
+    currencySettings: q.currencySettings || {},
+    title: q.title || "",
+    description: q.description || "",
+    countries: q.countries || [],
+    destination: q.destination || "",
+    duration: q.duration || "",
+    totalPrice: q.totalPrice || 0,
+    currency: q.currency || "USD",
+    type: q.type || "customized-package",
+    cartItems: q.cartItems || [],
+    htmlContent: q.htmlContent || "",
+    htmlBlocks: q.htmlBlocks || [],
+    serviceSlots: q.serviceSlots || [],
+    branding: q.branding || {},
+    gallery: q.gallery || [],
+    highlights: q.highlights || [],
+    images: q.images || [],
+    overviewEvents: q.overviewEvents || [],
+    notes: q.notes || "",
+    productId: q.productId || "",
+    productReferenceCode: q.productReferenceCode || ""
+  }
+}
+
 // POST /api/quotations/[id]/versions
 export async function POST(
   request: NextRequest,
@@ -33,43 +65,44 @@ export async function POST(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
-    // Check if current version is locked
-    if (quotation.isLocked) {
-      return NextResponse.json({ error: "Cannot create a new version because the current version is locked" }, { status: 400 })
+    // Check if current version is locked (prevent creating new version from a locked one)
+    // Actually, usually you WANT to create a new version from a locked one.
+    // But the current logic says if isLocked is true, it's finalized.
+
+    // 1. Snapshot the CURRENT state
+    const currentState = snapshotQuotationState(quotation)
+
+    // 2. Finalize the PREVIOUS version if it was a draft
+    const currentVersionNumber = quotation.currentVersion || 1
+    const currentIndex = quotation.versionHistory?.findIndex((v: any) => v.versionNumber === currentVersionNumber)
+    
+    if (currentIndex !== -1 && quotation.versionHistory) {
+        quotation.versionHistory[currentIndex].state = currentState
+        quotation.versionHistory[currentIndex].isDraft = false
+        quotation.versionHistory[currentIndex].isLocked = true
     }
 
-    // Initialize version history if it doesn't exist
-    if (!quotation.versionHistory) {
-      quotation.versionHistory = []
-    }
+    // 3. Determine the next version number
+    const nextVersion = (quotation.versionHistory?.length || 0) + 1
 
-    // Determine the next version number
-    const nextVersion = quotation.versionHistory.length + 1
-
-    // Capture current state for the version (detached snapshot)
-    const quotationSnapshot = quotation.toObject()
-    const versionState = {
-      days: quotationSnapshot.days,
-      pricingOptions: quotationSnapshot.pricingOptions,
-      subtotal: quotationSnapshot.subtotal,
-      markup: quotationSnapshot.markup,
-      total: quotationSnapshot.total,
-      currencySettings: quotationSnapshot.currencySettings
-    }
-
-    // Create a new version entry with current data
+    // 4. Create a new version entry with current data
+    if (!quotation.versionHistory) quotation.versionHistory = []
+    
     quotation.versionHistory.push({
       versionNumber: nextVersion,
       createdAt: new Date(),
       description,
       isLocked: false,
-      state: versionState,
+      state: currentState,
       isDraft: true
     })
 
-    // Update current version and mark as draft
+    // 5. Update current version and mark as draft
     quotation.currentVersion = nextVersion
     quotation.isDraft = true
+
+    // Mark modified for Mongoose
+    quotation.markModified("versionHistory")
 
     // Save changes
     await quotation.save()

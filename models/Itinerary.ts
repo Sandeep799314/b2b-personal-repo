@@ -115,6 +115,8 @@ export interface ICartItem {
   nights?: number // Not applicable for combo items except hotels
   quantity: number
   addedAt: Date
+  originalPrice?: number
+  offerTag?: string
 
   // Flight specific
   fromCity?: string
@@ -418,7 +420,7 @@ export interface IItineraryEvent {
   hotelTotalNights?: number // Total nights for the stay
 }
 
-const ItineraryEventSchema = new mongoose.Schema({
+export const ItineraryEventSchema = new mongoose.Schema({
   id: { type: String, required: true },
   time: { type: String },
   category: {
@@ -588,7 +590,7 @@ const ItineraryEventSchema = new mongoose.Schema({
   insuranceNotes: String,
 })
 
-const ItineraryDaySchema = new mongoose.Schema({
+export const ItineraryDaySchema = new mongoose.Schema({
   day: { type: Number, required: true },
   date: { type: String, required: true },
   title: { type: String, required: true },
@@ -676,6 +678,8 @@ const ItinerarySchema = new mongoose.Schema(
           required: true,
         },
         price: { type: Number, required: true },
+        originalPrice: Number,
+        offerTag: String,
         nights: Number,
         quantity: { type: Number, default: 1 },
         addedAt: { type: Date, default: Date.now },

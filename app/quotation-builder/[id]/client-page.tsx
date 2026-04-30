@@ -25,9 +25,17 @@ import { QuotationPricingOptions } from "@/models/Quotation"
 import html2canvas from "html2canvas"
 import jsPDF from "jspdf"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import { ItineraryBuilder } from "@/components/itinerary-builder"
 import { QuotationStatusStepper } from "@/components/quotation-status-stepper"
+import { UserWallet } from "@/components/user-wallet"
 import { Badge } from "@/components/ui/badge"
 
 // Define interfaces for type safety
@@ -60,6 +68,10 @@ export function QuotationDetail({ id }: { id: string }) {
   const [displayCurrency, setDisplayCurrency] = useState<string>("")
   const [versionLocked, setVersionLocked] = useState<boolean>(false)
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
+  const [isReadOnly, setIsReadOnly] = useState(false)
+  const [displayData, setDisplayData] = useState<any>(null)
+
   const previewRef = useRef<HTMLDivElement | null>(null)
 
   const router = useRouter()
@@ -72,6 +84,12 @@ export function QuotationDetail({ id }: { id: string }) {
     }
     setQuotation(updated)
     setVersionLocked(updated.isLocked || false)
+    
+    // Reset to latest version when synced
+    setSelectedVersion(updated.currentVersion || 1)
+    setIsReadOnly(false)
+    setDisplayData(null) // Use main quotation data
+    
     return updated
   }
 
@@ -79,14 +97,35 @@ export function QuotationDetail({ id }: { id: string }) {
   const recalculateTotals = (quotationData: QuotationData) => {
     // Calculate original total price from all events
     let originalTotal = 0;
+    let hasEventPrices = false;
+
+    // 1. Check days and events
     if (quotationData.days && quotationData.days.length > 0) {
       quotationData.days.forEach((day: Day) => {
         day.events.forEach((event: DayEvent) => {
           if (event.price) {
             originalTotal += parseFloat(event.price.toString());
+            hasEventPrices = true;
           }
         });
       });
+    }
+
+    // 2. Check cartItems (for cart-combo type)
+    if (quotationData.cartItems && quotationData.cartItems.length > 0) {
+      quotationData.cartItems.forEach((item: any) => {
+        if (item.price) {
+          originalTotal += (parseFloat(item.price.toString()) * (item.quantity || 1));
+          hasEventPrices = true;
+        }
+      });
+    }
+
+    // 3. Fallback to existing subtotal or originalTotalPrice if no individual prices found
+    if (!hasEventPrices) {
+      originalTotal = quotationData.subtotal || 
+                      quotationData.pricingOptions?.originalTotalPrice || 
+                      quotationData.totalPrice || 0;
     }
 
     // Create a quotation object with the calculated subtotal
@@ -113,6 +152,8 @@ export function QuotationDetail({ id }: { id: string }) {
         const updatedData = recalculateTotals(data);
         setQuotation(updatedData)
         setShowPrices(updatedData.pricingOptions.showIndividualPrices)
+        setSelectedVersion(updatedData.currentVersion || 1)
+        setIsReadOnly(false)
 
         // Set initial display currency to the quotation's base currency
         setDisplayCurrency(updatedData.currency || "USD")
@@ -132,6 +173,44 @@ export function QuotationDetail({ id }: { id: string }) {
 
     loadQuotation()
   }, [id, fetchQuotation])
+
+  const handleVersionChange = (versionNumber: string) => {
+    const v = parseInt(versionNumber)
+    setSelectedVersion(v)
+    
+    if (v === quotation?.currentVersion) {
+      setIsReadOnly(false)
+      setDisplayData(null)
+    } else {
+      const version = quotation?.versionHistory?.find(vh => vh.versionNumber === v)
+      if (version && version.state) {
+        setIsReadOnly(true)
+        setDisplayData(version.state)
+      }
+    }
+  }
+
+  // Use either displayData (from old version) or current quotation data
+  const currentDays = displayData?.days || quotation?.days || []
+  const currentPricing = displayData?.pricingOptions || quotation?.pricingOptions
+  const currentSubtotal = displayData?.subtotal || quotation?.subtotal
+  const currentTotal = displayData?.total || quotation?.total
+  const currentTitle = displayData?.title || quotation?.title
+  const currentDescription = displayData?.description || quotation?.description
+  const currentCountries = displayData?.countries || quotation?.countries
+  const currentProductReferenceCode = displayData?.productReferenceCode || quotation?.productReferenceCode
+  const currentBranding = displayData?.branding || quotation?.branding
+  const currentGallery = displayData?.gallery || quotation?.gallery
+  const currentOverviewEvents = displayData?.overviewEvents || quotation?.overviewEvents
+  const currentServiceSlots = displayData?.serviceSlots || quotation?.serviceSlots
+  const currentNotes = displayData?.notes || quotation?.notes
+  const currentHighlights = displayData?.highlights || quotation?.highlights
+  const currentImages = displayData?.images || quotation?.images
+  const currentType = displayData?.type || quotation?.type
+  const currentCartItems = displayData?.cartItems || quotation?.cartItems
+  const currentHtmlContent = displayData?.htmlContent || quotation?.htmlContent
+  const currentHtmlBlocks = displayData?.htmlBlocks || quotation?.htmlBlocks
+  const currentProductId = displayData?.productId || quotation?.productId
 
   const handleEditItinerary = () => {
     if (!quotation) return
@@ -474,7 +553,7 @@ export function QuotationDetail({ id }: { id: string }) {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-neutral-50 to-brand-primary-50/30">
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader />
+        <TopHeader showWallet={false} />
         <main className="flex-1 overflow-hidden flex flex-col">
           {quotation && (
             <>
@@ -485,16 +564,34 @@ export function QuotationDetail({ id }: { id: string }) {
                     Back
                   </Button>
                   <div className="h-6 w-px bg-neutral-200" />
-                  <h1 className="text-xl font-bold flex items-center gap-2">
-                    {quotation.title}
-                    <Badge variant="outline" className="font-mono text-xs">V{quotation.currentVersion || 1}</Badge>
-                  </h1>
+                  <div className="flex flex-col">
+                    <h1 className="text-xl font-bold flex items-center gap-2">
+                      {quotation.title}
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-medium text-neutral-500">Version:</span>
+                      <Select value={selectedVersion?.toString()} onValueChange={handleVersionChange}>
+                        <SelectTrigger className="h-7 w-[100px] text-xs">
+                          <SelectValue placeholder="Select version" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {quotation.versionHistory?.map((v) => (
+                            <SelectItem key={v.versionNumber} value={v.versionNumber.toString()}>
+                              V{v.versionNumber} {v.versionNumber === quotation.currentVersion ? '(Current)' : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {isReadOnly && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Read Only</Badge>}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-4">
+                  <div className="h-8 w-px bg-neutral-200" />
                   <QuotationStatusStepper
                     currentStatus={quotation.status}
                     onStatusChange={handleStatusChange}
-                    disabled={versionLocked && quotation.status !== 'draft'}
+                    disabled={isReadOnly || (versionLocked && quotation.status !== 'draft')}
                   />
                 </div>
               </div>
@@ -502,63 +599,62 @@ export function QuotationDetail({ id }: { id: string }) {
                 itineraryId={quotation.itineraryId}
                 quotationId={quotation._id}
                 mode="quotation"
+                readOnly={isReadOnly}
+                initialDays={currentDays}
+                initialPricingOptions={currentPricing}
+                initialTitle={currentTitle}
+                initialDescription={currentDescription}
+                initialCountries={currentCountries}
+                initialProductReferenceCode={currentProductReferenceCode}
+                initialBranding={currentBranding}
+                initialGallery={currentGallery}
+                initialOverviewEvents={currentOverviewEvents}
+                initialServiceSlots={currentServiceSlots}
+                initialNotes={currentNotes}
+                initialHighlights={currentHighlights}
+                initialImages={currentImages}
+                initialType={currentType}
+                initialCartItems={currentCartItems}
+                initialHtmlContent={currentHtmlContent}
+                initialHtmlBlocks={currentHtmlBlocks}
+                hideWallet={true}
                 onBack={() => router.push('/dashboard')}
-                onSave={async (data?: { itineraryId: string, quotationOptions: QuotationPricingOptions, days: any[] }) => {
+                onSave={async (data?: any) => {
                   console.log('[QUOTATION SAVE] onSave triggered with data:', data);
 
                   if (data && data.quotationOptions && data.days) {
                     try {
-                      console.log('[QUOTATION SAVE] Step 1: Received data from ItineraryBuilder');
-                      console.log('[QUOTATION SAVE] - Days count:', data.days.length);
-                      console.log('[QUOTATION SAVE] - Pricing options:', data.quotationOptions);
-
-                      // We need to construct a payload that includes:
-                      // 1. Existing quotation metadata (client, title, etc.)
-                      // 2. Updated pricing options
-                      // 3. Updated days (snapshot)
-                      // 4. Recalculated totals based on the new options and days
-
-                      // First, recalculate totals
-                      console.log('[QUOTATION SAVE] Step 2: Building temp quotation for recalculation');
+                      // Construct a temporary quotation to recalculate totals
                       const tempQuotation = {
                         ...quotation,
-                        days: data.days,
+                        ...data,
                         pricingOptions: data.quotationOptions
                       };
 
-                      console.log('[QUOTATION SAVE] Step 3: Recalculating totals');
                       const recalculated = recalculateTotals(tempQuotation);
-                      console.log('[QUOTATION SAVE] - Recalculated:', recalculated);
 
-                      console.log('[QUOTATION SAVE] Step 4: Constructing API payload');
+                      // Construct the payload with ALL fields from data
                       const payload = {
-                        days: data.days,
+                        ...data,
                         pricingOptions: recalculated.pricingOptions,
                         subtotal: recalculated.subtotal,
                         markup: recalculated.markup,
                         total: recalculated.total,
-                        // Preserve existing fields
                         client: quotation.client,
                         currencySettings: quotation.currencySettings,
-                        notes: quotation.notes,
-                        title: quotation.title,
-                        description: quotation.description,
+                        notes: data.notes || quotation.notes,
+                        title: data.title || quotation.title,
+                        description: data.description || quotation.description,
                         validUntil: quotation.validUntil,
                         totalPrice: recalculated.price || recalculated.total
                       };
 
-                      console.log('[QUOTATION SAVE] Step 5: Sending to API');
-                      console.log('[QUOTATION SAVE] - Quotation ID:', quotation._id);
-                      console.log('[QUOTATION SAVE] - Payload:', JSON.stringify(payload, null, 2));
-
                       const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
-
-                      console.log('[QUOTATION SAVE] Step 6: Save successful, syncing state');
                       syncQuotationState(updatedQuotation);
 
                       toast({
                         title: "Success",
-                        description: "Quotation saved successfully"
+                        description: "New version created successfully"
                       });
                     } catch (error) {
                       console.error('[QUOTATION SAVE] Error during save:', error);
@@ -568,9 +664,6 @@ export function QuotationDetail({ id }: { id: string }) {
                         variant: "destructive"
                       });
                     }
-                  } else {
-                    // Fallback if no specific quotation data is passed (just itinerary save)
-                    console.log('[QUOTATION SAVE] No quotation data in callback, data received:', data);
                   }
                 }}
                 extraActions={

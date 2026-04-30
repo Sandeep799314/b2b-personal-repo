@@ -16,6 +16,7 @@ import {
   Share2,
   DollarSign,
   Settings,
+  Wallet,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -44,6 +45,7 @@ export function Sidebar({ activeView, collapsed, setCollapsed }: SidebarProps) {
     { id: "weblinks", label: "Weblinks", icon: Share2 },
     { id: "finance", label: "Finance", icon: DollarSign },
     { id: "quotation-builder", label: "Quotation Builder", icon: FileText },
+    { id: "credits", label: "Payment & Credits", icon: Wallet },
     { id: "settings", label: "Settings", icon: Settings },
   ]
 

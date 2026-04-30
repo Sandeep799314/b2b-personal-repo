@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   Save,
@@ -31,7 +33,18 @@ import {
   FileText,
   Ship,
   Loader2,
-  Check
+  Check,
+  Info,
+  Copy,
+  Share2,
+  Download,
+  Moon,
+  LayoutGrid,
+  Users,
+  Calendar,
+  Clock,
+  Luggage,
+  MapPin
 } from "lucide-react"
 import { ICartItem } from "@/models/Itinerary"
 import { useToast } from "@/hooks/use-toast"
@@ -142,6 +155,323 @@ const COMPONENT_TEMPLATES = [
   },
 ]
 
+const PREVIEW_CATEGORIES: Record<string, { label: string; icon: string; color: string; border: string; text: string }> = {
+  flight: { label: "Flight", icon: "✈", color: "#E6F1FB", border: "#378ADD", text: "#0C447C" },
+  hotel: { label: "Hotel", icon: "🏨", color: "#EAF3DE", border: "#639922", text: "#27500A" },
+  activity: { label: "Activity", icon: "🎯", color: "#FAEEDA", border: "#BA7517", text: "#633806" },
+  transfer: { label: "Transfer", icon: "🚗", color: "#EEEDFE", border: "#7F77DD", text: "#3C3489" },
+  meal: { label: "Meal", icon: "🍴", color: "#FAECE7", border: "#D85A30", text: "#712B13" },
+  cruise: { label: "Cruise", icon: "🚢", color: "#E1F5EE", border: "#1D9E75", text: "#085041" },
+  ancillaries: { label: "Ancillaries", icon: "📋", color: "#FBEAF0", border: "#D4537E", text: "#72243E" },
+}
+
+const getCatMeta = (item: ICartItem) => {
+  const m = []
+  if (item.category === "flight") {
+    // Flight remains as is per user request
+    if (item.airline) m.push({ k: "Airline", v: item.airline })
+    if (item.flightNumber) m.push({ k: "Flight No", v: item.flightNumber })
+    if (item.fromCity && item.toCity) m.push({ k: "Route", v: `${item.fromCity} → ${item.toCity}` })
+    if (item.startTime) m.push({ k: "Dep. Time", v: item.startTime })
+  }
+  if (item.category === "hotel") {
+    if (item.hotelName) m.push({ k: "Property", v: item.hotelName })
+    if (item.roomCategory) m.push({ k: "Room", v: item.roomCategory })
+    if (item.location) m.push({ k: "Location", v: item.location })
+    if (item.nights) m.push({ k: "Duration", v: `${item.nights} Nights` })
+    if (item.adults) m.push({ k: "Pax", v: `${item.adults}A ${item.children || 0}C` })
+    if (item.mealPlan) m.push({ k: "Meal Plan", v: item.mealPlan })
+    if (item.propertyType) m.push({ k: "Type", v: item.propertyType })
+    if (item.hotelRating) m.push({ k: "Rating", v: `${item.hotelRating}★` })
+    if (item.confirmationNumber) m.push({ k: "Conf. No", v: item.confirmationNumber })
+    if (item.address) m.push({ k: "Address", v: item.address })
+  }
+  if (item.category === "transfer") {
+    if (item.fromLocation && item.toLocation) m.push({ k: "Route", v: `${item.fromLocation} → ${item.toLocation}` })
+    if (item.vehicleType) m.push({ k: "Vehicle", v: item.vehicleType })
+    if (item.carModel) m.push({ k: "Model", v: item.carModel })
+    if (item.transferType) m.push({ k: "Type", v: item.transferType })
+    if (item.pickupTime) m.push({ k: "Pickup", v: item.pickupTime })
+    if (item.dropTime) m.push({ k: "Drop", v: item.dropTime })
+    if (item.fuelType) m.push({ k: "Fuel", v: item.fuelType })
+    if (item.transmission) m.push({ k: "Transmission", v: item.transmission })
+    if (item.pnr) m.push({ k: "Ref/PNR", v: item.pnr })
+  }
+  if (item.category === "activity") {
+    if (item.location) m.push({ k: "Location", v: item.location })
+    if (item.duration) m.push({ k: "Duration", v: item.duration })
+    if (item.startTime) m.push({ k: "Starts", v: item.startTime })
+    if (item.difficulty) m.push({ k: "Level", v: item.difficulty })
+  }
+  if (item.category === "meal") {
+    if (item.mealType) m.push({ k: "Meal", v: item.mealType })
+    if (item.startTime) m.push({ k: "Time", v: item.startTime })
+    if (item.location) m.push({ k: "Venue", v: item.location })
+  }
+  if (item.category === "ancillaries") {
+    if (item.subCategory) m.push({ k: "Category", v: item.subCategory })
+    if (item.country) m.push({ k: "Country", v: item.country })
+    if (item.visaType) m.push({ k: "Visa Type", v: item.visaType })
+    if (item.visaDuration) m.push({ k: "Validity", v: item.visaDuration })
+    if (item.entryMethod) m.push({ k: "Entry", v: item.entryMethod })
+    if (item.insuranceProvider) m.push({ k: "Provider", v: item.insuranceProvider })
+    if (item.policyNumber) m.push({ k: "Policy", v: item.policyNumber })
+  }
+  if (item.category === "other") {
+    if (item.subCategory) m.push({ k: "Type", v: item.subCategory })
+    if (item.giftAmount) m.push({ k: "Value", v: item.giftAmount })
+  }
+  return m
+}
+
+function CartItemCard({ 
+  item, 
+  onEdit, 
+  onDelete, 
+  showPrice,
+  currency = "INR" 
+}: { 
+  item: ICartItem, 
+  onEdit: (item: ICartItem) => void, 
+  onDelete: (id: string) => void,
+  showPrice: boolean,
+  currency?: string
+}) {
+  const cat = PREVIEW_CATEGORIES[item.category] || PREVIEW_CATEGORIES.activity;
+  const meta = getCatMeta(item);
+  const IconComponent = CATEGORY_ICONS[item.category as keyof typeof CATEGORY_ICONS] || Package;
+  const [isHovered, setIsHovered] = useState(false);
+
+  const formatCurrencyValue = (amount: number, curr: string) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: curr,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  // Parse date
+  const dateObj = new Date(item.date + "T00:00:00")
+  const day = dateObj.getDate()
+  const month = dateObj.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+  const weekday = dateObj.toLocaleDateString("en-US", { weekday: "short" })
+
+  const isFlight = item.category === "flight"
+  const hasOffer = item.originalPrice && item.originalPrice > item.price
+
+  return (
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="relative border rounded-[14px] bg-white transition-all duration-200 group overflow-hidden h-[190px] flex items-stretch"
+      style={{
+        borderColor: isHovered ? cat.border : "#eee",
+        boxShadow: isHovered ? "0 4px 20px rgba(0,0,0,0.07)" : "none",
+      }}
+    >
+      {/* Date Section - Professional Vertical Strip */}
+      <div 
+        className="w-[70px] flex-shrink-0 border-r flex flex-col items-center justify-center py-4 shadow-[inset_-1px_0_0_rgba(0,0,0,0.05)]"
+        style={{
+          background: 'linear-gradient(135deg, #FDB931 0%, #E7A500 100%)',
+          borderColor: '#D4AF37'
+        }}
+      >
+        <div className="text-[10px] font-black text-amber-950/70 uppercase tracking-[0.15em] mb-1">{weekday}</div>
+        <div className="text-[30px] font-black text-amber-950 leading-none tracking-tighter drop-shadow-sm">{day}</div>
+        <div className="text-[11px] font-black text-amber-900 uppercase tracking-[0.2em] mt-1">{month}</div>
+      </div>
+
+      {/* Action buttons */}
+      <div className={cn(
+        "absolute top-3 right-3 flex gap-1.5 transition-opacity duration-200 z-30",
+        isHovered ? "opacity-100" : "opacity-0"
+      )}>
+        <button 
+          onClick={() => onEdit(item)}
+          className="w-7 h-7 rounded-lg bg-neutral-100 hover:bg-neutral-200 flex items-center justify-center transition-colors shadow-sm"
+        >
+          <Edit className="w-3.5 h-3.5 text-neutral-600" />
+        </button>
+        <button 
+          onClick={() => onDelete(item.id)}
+          className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center text-red-600 transition-colors shadow-sm"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="flex-1 flex items-stretch overflow-hidden">
+        {isFlight ? (
+          /* PREMIUM FLIGHT LAYOUT */
+          <div className="flex-1 flex flex-col bg-white">
+            {/* Airline Header */}
+            <div className="px-5 py-2.5 flex items-center justify-between border-b border-neutral-50">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-red-600 rounded-md flex items-center justify-center text-white shadow-sm overflow-hidden">
+                  <span className="text-[10px] font-black italic transform -skew-x-12 tracking-tighter">AI</span>
+                </div>
+                <div>
+                  <h5 className="text-[13px] font-black text-neutral-800 tracking-tight leading-none uppercase">
+                    {item.airline || "Air India"}
+                  </h5>
+                  <p className="text-[10px] font-bold text-neutral-400 mt-0.5 uppercase tracking-widest">
+                    {item.flightNumber || "AI-101"} • {item.flightClass || "ECONOMY"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Flight Path Visualization */}
+            <div className="px-6 py-4 flex items-center justify-between relative flex-1">
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[35%] flex flex-col items-center">
+                <span className="text-[10px] font-bold text-neutral-300 uppercase tracking-[0.15em] mb-1">{item.duration || "DIRECT"}</span>
+                <div className="w-full flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-neutral-200" />
+                  <div className="flex-1 h-[1px] border-t border-dashed border-neutral-300" />
+                  <Plane className="h-5 w-5 text-neutral-400 rotate-90" />
+                  <div className="flex-1 h-[1px] border-t border-dashed border-neutral-300" />
+                  <div className="h-2 w-2 rounded-full border border-neutral-300" />
+                </div>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-[26px] font-black text-neutral-800 leading-none tracking-tight">
+                  {item.fromCity?.substring(0, 3).toUpperCase() || "DEL"}
+                </span>
+                <span className="text-[14px] font-bold text-neutral-900 mt-1">{item.startTime || "00:00"}</span>
+              </div>
+
+              <div className="flex flex-col items-end text-right">
+                <span className="text-[26px] font-black text-neutral-800 leading-none tracking-tight">
+                  {item.toCity?.substring(0, 3).toUpperCase() || "DXB"}
+                </span>
+                <span className="text-[14px] font-bold text-neutral-900 mt-1">{item.endTime || "00:00"}</span>
+              </div>
+            </div>
+
+            {/* Footer Details & Price */}
+            <div className="mt-auto bg-neutral-50/50 px-5 py-2.5 flex items-center justify-between border-t border-neutral-100">
+               <div className="flex items-center gap-6">
+                 {item.pnr && (
+                   <div className="flex flex-col">
+                     <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">PNR</span>
+                     <span className="text-[10px] font-black text-neutral-800 uppercase">{item.pnr}</span>
+                   </div>
+                 )}
+                 {item.checkinBagWeight && (
+                   <div className="flex flex-col">
+                     <span className="text-[8px] font-bold text-neutral-400 uppercase tracking-widest">Baggage</span>
+                     <span className="text-[10px] font-black text-neutral-800 uppercase">{item.checkinBagWeight}</span>
+                   </div>
+                 )}
+               </div>
+               
+               <div className="flex items-center gap-4">
+                 {item.offerTag && (
+                    <div className="bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-tighter">
+                      {item.offerTag}
+                    </div>
+                  )}
+                 {showPrice && (
+                    <div className="flex flex-col items-end">
+                      {hasOffer && (
+                        <span className="text-[9px] text-neutral-400 line-through font-medium leading-none mb-1">
+                          {formatCurrencyValue(item.originalPrice! * (item.quantity || 1), currency)}
+                        </span>
+                      )}
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[9px] text-neutral-400 uppercase font-bold tracking-tighter">
+                          {formatCurrencyValue(Number(item.price) || 0, currency)} × {item.quantity} =
+                        </span>
+                        <span className="text-[20px] font-black text-neutral-900 leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                          {formatCurrencyValue((Number(item.price) || 0) * (Number(item.quantity) || 1), currency)}
+                        </span>
+                      </div>
+                    </div>
+                 )}
+               </div>
+            </div>
+          </div>
+        ) : (
+          /* NEW STYLISH PROFESSIONAL LAYOUT (Hotel, Activity, Transfer, etc.) */
+          <div className="flex-1 flex flex-col bg-white">
+            {/* Professional Header Strip */}
+            <div className="px-5 py-2 flex items-center justify-between border-b border-neutral-50" style={{ background: `${cat.color}20` }}>
+              <div className="flex items-center gap-2.5">
+                <div 
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shadow-sm border"
+                  style={{ backgroundColor: cat.color, borderColor: `${cat.border}40` }}
+                >
+                  <IconComponent className="w-4 h-4" style={{ color: cat.text }} />
+                </div>
+                <span className="text-[10px] font-black tracking-[0.2em] uppercase" style={{ color: cat.text }}>
+                  {cat.label}
+                </span>
+              </div>
+              {item.location && (
+                <div className="flex items-center gap-1 text-neutral-400">
+                  <MapPin className="w-3 h-3" />
+                  <span className="text-[10px] font-bold truncate max-w-[150px] uppercase tracking-tighter">{item.location}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Main Content Area */}
+            <div className="p-5 flex-1 flex flex-col">
+              <h4 className="text-[20px] text-neutral-900 font-bold leading-tight mb-4 pr-12" style={{ fontFamily: 'Georgia, serif' }}>
+                {item.name || item.hotelName || 'Untitled Service'}
+              </h4>
+
+              {/* Structured Details Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-y-4 gap-x-6">
+                {meta.filter(m => m.k !== "Location" && m.k !== "Property").map((m, idx) => (
+                  <div key={idx} className="flex flex-col gap-0.5">
+                    <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{m.k}</span>
+                    <span className="text-[12px] text-neutral-800 font-black tracking-tight">{m.v}</span>
+                  </div>
+                ))}
+              </div>
+
+              {item.description && (
+                <p className="text-[11px] text-neutral-400 leading-relaxed line-clamp-2 mt-4 italic border-l-2 border-neutral-100 pl-3">
+                  {item.description}
+                </p>
+              )}
+            </div>
+
+            {/* Price Footer */}
+            {showPrice && (
+              <div className="bg-neutral-50/50 px-5 py-2.5 border-t border-neutral-100 flex items-center justify-end gap-4">
+                {item.offerTag && (
+                  <div className="bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-tighter shadow-sm">
+                    {item.offerTag}
+                  </div>
+                )}
+                <div className="flex flex-col items-end">
+                  {hasOffer && (
+                    <span className="text-[9px] text-neutral-400 line-through font-medium leading-none mb-1">
+                      {formatCurrencyValue(item.originalPrice! * (item.quantity || 1), currency)}
+                    </span>
+                  )}
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-tight">
+                      {formatCurrencyValue(Number(item.price) || 0, currency)} × {item.quantity} =
+                    </span>
+                    <span className="text-[22px] font-black text-neutral-900 leading-none" style={{ fontFamily: 'Georgia, serif' }}>
+                      {formatCurrencyValue((Number(item.price) || 0) * (Number(item.quantity) || 1), currency)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps) {
   const { toast } = useToast()
   const [title, setTitle] = useState("New Cart/Combo")
@@ -154,6 +484,29 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   const [draggedComponent, setDraggedComponent] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  
+  // New states for the Action Toggles Block
+  const [viewMode, setViewMode] = useState<'itinerary' | 'all-inclusions'>('itinerary')
+  const [isDetailedView, setIsDetailedView] = useState(true)
+  const [showDates, setShowDates] = useState(true)
+  const [pricingEnabled, setPricingEnabled] = useState(true)
+  const [pricingCurrency, setPricingCurrency] = useState('INR')
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false)
+  const [pricingDialogOpen, setPricingDialogOpen] = useState(false)
+  const [pricingRooms, setPricingRooms] = useState(1)
+  const [pricingAdults, setPricingAdults] = useState(2)
+  const [pricingChildren, setPricingChildren] = useState(0)
+  const [pricingNationality, setPricingNationality] = useState("Indian")
+  const [pricingStartDate, setPricingStartDate] = useState("")
+  const [pricingEndDate, setPricingEndDate] = useState("")
+
+  const handleCreateCopy = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Copying cart/combo will be available soon.",
+    })
+  }
 
   // Initialize form state
   const [itemForm, setItemForm] = useState<Partial<ICartItem>>({
@@ -250,8 +603,20 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   // Gallery state
   const [gallery, setGallery] = useState<IGalleryItem[]>([])
 
-  // Preview state
-  const [showPreview, setShowPreview] = useState(false)
+  const handlePreview = () => {
+    const previewData = {
+      title,
+      description,
+      productId,
+      cartItems,
+      gallery,
+      totalPrice: getTotalPrice(),
+      currency: "USD", // Default, can be improved to use item currency if mixed
+      itineraryId,
+    }
+    localStorage.setItem("cart-combo-preview", JSON.stringify(previewData))
+    window.open("/cart-combo/preview", "_blank")
+  }
 
   // Check for view mode from URL
   useEffect(() => {
@@ -259,7 +624,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
       const params = new URLSearchParams(window.location.search)
       const mode = params.get('mode')
       if (mode === 'view' && cartItems.length > 0) {
-        setShowPreview(true)
+        handlePreview()
       }
     }
   }, [cartItems.length])
@@ -269,7 +634,69 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
     if (itineraryId) {
       loadCartData()
     }
-  }, [])
+  }, [itineraryId])
+
+  // Chatbot event listeners
+  useEffect(() => {
+    const handleChatbotAddEvent = (e: any) => {
+      const { eventData } = e.detail;
+      console.log("[DEBUG] Chatbot adding item to cart:", eventData);
+      
+      const newItem: ICartItem = {
+        ...eventData,
+        id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        productId: `${productId}-${cartItems.length + 1}`,
+        addedAt: new Date(),
+        quantity: eventData.quantity || 1,
+        price: Number(eventData.price) || 0,
+        date: eventData.date || new Date().toISOString().split('T')[0], // Cart items need a date
+      }
+
+      setCartItems(prev => [...prev, newItem]);
+      
+      toast({
+        title: "Item Added",
+        description: `${eventData.title || eventData.name} added to cart by AI Assistant`,
+      });
+    };
+
+    const handleChatbotUpdateTitle = (e: any) => {
+      const { title: newTitle } = e.detail;
+      if (newTitle) {
+        setTitle(newTitle);
+        toast({
+          title: "Title Updated",
+          description: `Cart/Combo title changed to "${newTitle}"`,
+        });
+      }
+    };
+
+    const handleChatbotSave = async (e: any) => {
+      const { exitAfterSave } = e.detail || {};
+      await handleSave();
+      if (exitAfterSave && onBack) {
+        onBack();
+      }
+    };
+
+    const handleChatbotExit = () => {
+      if (onBack) {
+        onBack();
+      }
+    };
+
+    window.addEventListener("chatbot-add-event", handleChatbotAddEvent);
+    window.addEventListener("chatbot-update-title", handleChatbotUpdateTitle);
+    window.addEventListener("chatbot-save", handleChatbotSave);
+    window.addEventListener("chatbot-exit", handleChatbotExit);
+    
+    return () => {
+      window.removeEventListener("chatbot-add-event", handleChatbotAddEvent);
+      window.removeEventListener("chatbot-update-title", handleChatbotUpdateTitle);
+      window.removeEventListener("chatbot-save", handleChatbotSave);
+      window.removeEventListener("chatbot-exit", handleChatbotExit);
+    };
+  }, [productId, cartItems.length, onBack]);
 
   const loadCartData = async () => {
     try {
@@ -519,72 +946,20 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   }
 
   // Sort cart items by date
-  const sortedCartItems = [...cartItems].sort((a, b) => {
-    return new Date(a.date).getTime() - new Date(b.date).getTime()
-  })
+  const sortedCartItems = useMemo(() => {
+    return [...cartItems].sort((a, b) => {
+      return new Date(a.date).getTime() - new Date(b.date).getTime()
+    })
+  }, [cartItems])
 
-  // Render item details based on category
-  const renderItemDetails = (item: ICartItem) => {
-    switch (item.category) {
-      case "flight":
-        return (
-          <div className="flex items-center gap-2 text-sm text-gray-700 mt-2">
-            <span className="font-medium">{item.fromCity || "N/A"}</span>
-            <ArrowRight className="h-4 w-4 text-gray-400" />
-            <span className="font-medium">{item.toCity || "N/A"}</span>
-            {item.airline && <span className="text-gray-500">• {item.airline}</span>}
-          </div>
-        )
-      case "hotel":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.hotelName && <p className="font-medium">{item.hotelName}</p>}
-            {item.location && <p className="text-gray-600">{item.location}</p>}
-          </div>
-        )
-      case "transfer":
-        return (
-          <div className="flex items-center gap-2 text-sm text-gray-700 mt-2">
-            <span className="font-medium">{item.fromLocation || "N/A"}</span>
-            <ArrowRight className="h-4 w-4 text-gray-400" />
-            <span className="font-medium">{item.toLocation || "N/A"}</span>
-          </div>
-        )
-      case "activity":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.location && <p className="text-gray-600">{item.location}</p>}
-          </div>
-        )
-      case "ancillaries":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.subCategory && <p className="capitalize font-medium">{item.subCategory}</p>}
-            {item.visaType && <p>Type: {item.visaType}</p>}
-          </div>
-        )
-      case "cruise":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.location && <p className="font-medium">{item.location}</p>}
-          </div>
-        )
-      case "image":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.imageCaption && <p className="italic">{item.imageCaption}</p>}
-          </div>
-        )
-      case "meal":
-        return (
-          <div className="text-sm text-gray-700 mt-2">
-            {item.mealType && <span className="text-gray-600 capitalize">{item.mealType}</span>}
-          </div>
-        )
-      default:
-        return null
-    }
-  }
+  // Group items by date for the new layout
+  const groupedItems = useMemo(() => {
+    return sortedCartItems.reduce((acc, item) => {
+      if (!acc[item.date]) acc[item.date] = []
+      acc[item.date].push(item)
+      return acc
+    }, {} as Record<string, ICartItem[]>)
+  }, [sortedCartItems])
 
   return (
     <div className="flex flex-col lg:flex-row h-screen relative overflow-x-hidden bg-[#f8fafc]">
@@ -607,87 +982,313 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
         </div>
       </div>
 
-      {/* Vertical EDITOR MODE strip */}
-      <div
-        className="hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40"
-        style={{
-          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-        }}
-      >
-        <span
-          className="text-white font-bold text-sm tracking-widest whitespace-nowrap uppercase lg:sticky lg:top-1/2 lg:-translate-y-1/2"
-          style={{
-            writingMode: 'vertical-rl',
-            textOrientation: 'mixed',
-            transform: 'rotate(180deg)',
-            letterSpacing: '0.15em'
-          }}
-        >
-          Editor Mode
-        </span>
-      </div>
-
       {/* Main Content */}
-      <div className="flex-1 p-6 overflow-y-auto">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Cart/Combo Builder</h1>
-              <p className="text-sm text-gray-500">Build individual item collections</p>
+      <div className="flex-1 p-6 overflow-y-auto bg-[#f8fafc] max-w-[1200px] mx-auto w-full">
+        {/* Top Tag */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg bg-neutral-100 border border-neutral-200 border-b-0 text-[10px] font-bold text-neutral-500 uppercase tracking-widest ml-1">
+          <ShoppingCart className="h-3 w-3 text-neutral-400" />
+          Cart/Combo Builder
+        </div>
+
+        {/* Professional Header Card */}
+        <div className="bg-white rounded-xl rounded-tl-none shadow-sm border border-neutral-200 mb-6 p-4 relative overflow-hidden">
+          {/* Subtle Top Accent */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500" />
+
+          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-4">
+            <div className="flex flex-1 items-start">
+              <div className="flex-1 space-y-1">
+                {/* Title Section */}
+                <div className="group relative">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Cart/Combo Title"
+                    className="w-full text-xl lg:text-2xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all"
+                    style={{ fontWeight: 900 }}
+                  />
+                  <div className="h-0.5 w-full bg-neutral-100 mt-1 group-focus-within:bg-blue-400 transition-colors" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePreview}
+                disabled={cartItems.length === 0}
+                className="h-9 px-4 text-xs font-bold border-neutral-200 text-neutral-600 hover:bg-neutral-50 shadow-sm"
+              >
+                <Eye className="mr-2 h-3.5 w-3.5" />
+                Preview
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                size="sm"
+                className={`${
+                  showSaved ? "bg-green-600 hover:bg-green-700" : "bg-[#2D7CEA] hover:bg-[#1e63c7]"
+                } text-white shadow-md transition-all duration-300 px-5 h-9 text-xs font-bold`}
+              >
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : showSaved ? (
+                  <Check className="mr-2 h-3.5 w-3.5" />
+                ) : (
+                  <Save className="mr-2 h-3.5 w-3.5" />
+                )}
+                {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+              </Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowPreview(true)} disabled={cartItems.length === 0}>
-              <Eye className="h-4 w-4 mr-2" />
-              Preview
-            </Button>
-            <Button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300`}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-2">
+            <div className="lg:col-span-4 bg-neutral-50 rounded-lg p-2 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
+              <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-1 block">
+                Product ID
+              </label>
+              <div className="flex items-center gap-2">
+                <Package className="h-3.5 w-3.5 text-neutral-400" />
+                <Input
+                  value={productId}
+                  onChange={(e) => setProductId(e.target.value)}
+                  placeholder="Enter product ID"
+                  className="flex-1 border-none p-0 h-auto text-xs font-semibold bg-transparent focus-visible:ring-0"
+                />
+              </div>
+            </div>
+            <div className="lg:col-span-8 bg-neutral-50 rounded-lg p-2 border border-neutral-100 focus-within:border-blue-200 focus-within:bg-white transition-all">
+              <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-widest mb-1 block">
+                Description
+              </label>
+              <div className="flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-neutral-400" />
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Enter description..."
+                  rows={1}
+                  className="flex-1 border-none p-0 h-auto text-xs font-medium bg-transparent focus-visible:ring-0 resize-none placeholder:text-neutral-300 custom-scrollbar"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Toggles Block - Tab-like for Mobile */}
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+            {/* Itinerary / Item-wise Group */}
+            <div className="flex items-center gap-1 p-1 bg-neutral-100/50 rounded-xl">
+              <Button
+                variant={viewMode === "itinerary" ? "white" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-8 text-[10px] lg:text-xs font-bold px-4 rounded-lg transition-all",
+                  viewMode === "itinerary" ? "bg-white shadow-sm text-black" : "text-black",
+                )}
+                onClick={() => setViewMode("itinerary")}
+              >
+                Itinerary
+              </Button>
+              <Button
+                variant={viewMode === "all-inclusions" ? "white" : "ghost"}
+                size="sm"
+                className={cn(
+                  "h-8 text-[10px] lg:text-xs font-bold px-4 rounded-lg transition-all",
+                  viewMode === "all-inclusions" ? "bg-white shadow-sm text-black" : "text-black",
+                )}
+                onClick={() => setViewMode("all-inclusions")}
+              >
+                Item-wise
+              </Button>
+            </div>
+
+            {/* Details Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsDetailsModalOpen(true)}
+              className="h-8 px-3 text-[10px] lg:text-xs font-bold text-black hover:bg-neutral-100 rounded-lg flex items-center gap-1.5 border border-neutral-200"
             >
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : showSaved ? (
-                <Check className="mr-2 h-4 w-4" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+              <span className="hidden sm:inline-block">
+                <Info className="h-3.5 w-3.5" />
+              </span>
+              Details
+            </Button>
+
+            {/* Switch Group: Detailed, Dates, Pricing */}
+            <div className="flex items-center gap-4 lg:gap-6 border-l border-neutral-200 pl-4 lg:pl-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="detailed-v"
+                  checked={isDetailedView}
+                  onCheckedChange={setIsDetailedView}
+                  className="scale-75"
+                />
+                <label htmlFor="detailed-v" className="text-[10px] font-bold text-black uppercase">
+                  Detailed
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="dates-v" checked={showDates} onCheckedChange={setShowDates} className="scale-75" />
+                <label htmlFor="dates-v" className="text-[10px] font-bold text-black uppercase">
+                  Dates
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="pricing-v"
+                  checked={pricingEnabled}
+                  onCheckedChange={(v) => {
+                    setPricingEnabled(Boolean(v))
+                    if (v) setPricingDialogOpen(true)
+                  }}
+                  className="scale-75"
+                />
+                <label htmlFor="pricing-v" className="text-[10px] font-bold text-black uppercase">
+                  Pricing
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 lg:gap-2 ml-4">
+            <select
+              value={pricingCurrency}
+              onChange={(e) => {
+                const newCurrency = e.target.value
+                setPricingCurrency(newCurrency)
+              }}
+              className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
+            >
+              <option value="INR">₹ INR</option>
+              <option value="USD">$ USD</option>
+              <option value="EUR">€ EUR</option>
+              <option value="GBP">£ GBP</option>
+              <option value="AED">د.إ AED</option>
+            </select>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCreateCopy}
+              disabled={isSaving}
+              className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg"
+              title="Copy"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handlePreview}
+              disabled={isGeneratingPreview}
+              className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg"
+              title="Preview"
+            >
+              {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <div className="w-px h-4 bg-neutral-200 mx-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg"
+              title="Share"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg"
+              title="Download PDF"
+            >
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Basic Information */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Title</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter cart/combo title" />
+        {/* Pricing Info Display Row */}
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
+          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+            {/* Pax & Room Info */}
+            <div className="flex items-center gap-2 p-1 bg-neutral-100/50 rounded-xl px-3 h-9">
+              <div className="flex items-center gap-1.5 border-r border-neutral-200 pr-3 mr-1">
+                <Building2 className="h-3.5 w-3.5 text-neutral-500" />
+                <span className="text-[10px] lg:text-xs font-bold text-black uppercase">
+                  {pricingRooms} {pricingRooms === 1 ? "Room" : "Rooms"}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-neutral-500" />
+                  <span className="text-[10px] lg:text-xs font-bold text-black uppercase">{pricingAdults} Adults</span>
+                </div>
+                {pricingChildren > 0 && (
+                  <div className="flex items-center gap-1.5 border-l border-neutral-200 pl-3">
+                    <span className="text-[10px] lg:text-xs font-bold text-black uppercase">
+                      {pricingChildren} Children
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <Label>Product ID</Label>
-              <Input value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="Enter product ID" />
+
+            {/* Nationality & Currency */}
+            <div className="flex items-center gap-4 lg:gap-6 border-l border-neutral-200 pl-4 lg:pl-6 h-9">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Nationality:</span>
+                <Badge
+                  variant="outline"
+                  className="bg-blue-50/50 text-blue-700 border-blue-100 text-[10px] font-bold uppercase"
+                >
+                  {pricingNationality}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 border-l border-neutral-200 pl-4 lg:pl-6">
+                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Currency:</span>
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-50/50 text-emerald-700 border-emerald-100 text-[10px] font-bold uppercase"
+                >
+                  {pricingCurrency}
+                </Badge>
+              </div>
             </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter description"
-                rows={3}
-              />
+          </div>
+
+          {/* Pricing Dates */}
+          <div className="flex items-center gap-4 border-l border-neutral-200 pl-4 h-9">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+              <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Travel Dates:</span>
+              <span className="text-[10px] lg:text-xs font-bold text-black uppercase">
+                {pricingStartDate
+                  ? new Date(pricingStartDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })
+                  : "Set Date"}
+                {pricingEndDate &&
+                  ` - ${new Date(pricingEndDate).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}`}
+              </span>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPricingDialogOpen(true)}
+              className="h-7 w-7 p-0 hover:bg-neutral-100 rounded-full"
+            >
+              <Edit className="h-3.5 w-3.5 text-neutral-400" />
+            </Button>
+          </div>
+        </div>
 
         {/* Cart Items Drop Zone */}
         <Card
@@ -704,79 +1305,24 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
             </div>
           </CardHeader>
           <CardContent>
-            {sortedCartItems.length === 0 ? (
+            {cartItems.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
                 <ShoppingCart className="h-16 w-16 mx-auto text-gray-300 mb-4" />
                 <p className="text-gray-600 font-medium mb-2">No items in cart</p>
                 <p className="text-sm text-gray-500">Drag components from the right sidebar to add items</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {sortedCartItems.map((item) => {
-                  const IconComponent = CATEGORY_ICONS[item.category] || Package
-                  const { day, month, year } = formatDate(item.date)
-                  return (
-                    <div
-                      key={item.id}
-                      className="border-2 rounded-xl overflow-hidden hover:shadow-lg transition-shadow bg-white border-l-4 border-l-yellow-400"
-                    >
-                      <div className="flex items-center">
-                        {/* Date Section - Left Side */}
-                        <div className="flex-shrink-0 w-32 bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-4 flex flex-col items-center justify-center h-full min-h-[120px]">
-                          <div className="text-4xl font-black leading-none">{day}</div>
-                          <div className="text-lg font-bold tracking-wider mt-1">{month}</div>
-                          <div className="text-sm font-medium mt-1 opacity-90">{year}</div>
-                        </div>
-
-                        {/* Content Section - Middle */}
-                        <div className="flex-1 p-4">
-                          <div className="flex items-start gap-3">
-                            <div className={`p-2 rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS.other}`}>
-                              <IconComponent className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-bold text-lg text-gray-900">{item.name}</h4>
-                              {item.description && <p className="text-sm text-gray-600 mt-1">{item.description}</p>}
-                              {renderItemDetails(item)}
-                              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <Badge variant="secondary" className="text-xs capitalize">
-                                  {item.category}
-                                </Badge>
-                                <span className="text-xs text-gray-500">Qty: {item.quantity}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Price and Actions - Right Side */}
-                        <div className="flex-shrink-0 flex items-center gap-4 pr-4">
-                          <div className="text-right">
-                            <p className="text-2xl font-black text-gray-900">
-                              {item.currency === "INR" ? "₹" : "$"}
-                              {((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
-                            </p>
-                          </div>
-
-                          <div className="h-12 w-px bg-gray-200" />
-
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => handleEditItem(item)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteItem(item.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="flex flex-col gap-6">
+                {sortedCartItems.map((item) => (
+                  <CartItemCard 
+                    key={item.id} 
+                    item={item} 
+                    onEdit={handleEditItem} 
+                    onDelete={handleDeleteItem}
+                    showPrice={pricingEnabled}
+                    currency={pricingCurrency}
+                  />
+                ))}
               </div>
             )}
           </CardContent>
@@ -1284,175 +1830,6 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
               <Button onClick={editingItem ? handleUpdateItem : handleAddItem}>
                 {editingItem ? "Update" : "Add"} Item
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preview Modal */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          {/* ... existing preview code ... */}
-          {/* REUSING EXISTING PREVIEW CODE (Collapsed for brevity in thought process but included in execution) */}
-          <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-                <p className="text-sm text-gray-500">{productId}</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setShowPreview(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-6">
-              {/* Description */}
-              {description && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-700">{description}</p>
-                </div>
-              )}
-
-              {/* Cart Items by Date */}
-              <div className="space-y-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5" />
-                  Package Contents
-                </h3>
-
-                {/* Group items by date */}
-                {(() => {
-                  const itemsByDate = sortedCartItems.reduce((acc, item) => {
-                    if (!acc[item.date]) {
-                      acc[item.date] = []
-                    }
-                    acc[item.date].push(item)
-                    return acc
-                  }, {} as Record<string, ICartItem[]>)
-
-                  return Object.entries(itemsByDate).map(([date, items]) => {
-                    const { day, month, year } = formatDate(date)
-                    return (
-                      <div key={date} className="space-y-3">
-                        {/* Date Header */}
-                        <div className="flex items-center gap-3 pb-2 border-b-2 border-blue-200">
-                          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-lg">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-2xl font-black">{day}</span>
-                              <span className="text-sm font-bold">{month}</span>
-                              <span className="text-xs opacity-75">{year}</span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {items.length} {items.length === 1 ? "item" : "items"}
-                          </div>
-                        </div>
-
-                        {/* Items for this date */}
-                        <div className="space-y-3 pl-4">
-                          {items.map((item) => {
-                            const IconComponent = CATEGORY_ICONS[item.category] || Package
-                            return (
-                              <div
-                                key={item.id}
-                                className="flex items-start gap-4 p-4 rounded-lg border-2 border-gray-100 hover:border-blue-200 transition-colors bg-white border-l-4 border-l-yellow-400"
-                              >
-                                {/* Icon */}
-                                <div className={`p-3 rounded-full ${CATEGORY_COLORS[item.category] || CATEGORY_COLORS.other} flex-shrink-0`}>
-                                  <IconComponent className="h-6 w-6" />
-                                </div>
-
-                                {/* Details */}
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-bold text-lg text-gray-900">{item.name}</h4>
-                                  {item.description && (
-                                    <p className="text-sm text-gray-600 mt-1">{item.description}</p>
-                                  )}
-
-                                  {/* Category-specific details */}
-                                  <div className="mt-2 text-sm text-gray-700">
-                                    {/* Simplified View Logic for Preview - can extend later */}
-                                    {renderItemDetails(item)}
-                                  </div>
-
-                                  {/* Meta info */}
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <Badge variant="secondary" className="text-xs capitalize">
-                                      {item.category}
-                                    </Badge>
-                                    {item.quantity > 1 && (
-                                      <span className="text-xs text-gray-500">Qty: {item.quantity}</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Price */}
-                                <div className="text-right flex-shrink-0">
-                                  <p className="text-xl font-black text-gray-900">
-                                    {item.currency === "INR" ? "₹" : "$"}
-                                    {((Number(item.price) || 0) * (Number(item.quantity) || 1)).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })
-                })()}
-              </div>
-
-              {/* Gallery Preview */}
-              {gallery.length > 0 && (
-                <div className="space-y-4 border-t pt-6">
-                  <h3 className="text-xl font-bold text-gray-900">Gallery</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {gallery.map((image, index) => (
-                      <div key={index} className="relative aspect-video rounded-lg overflow-hidden">
-                        <img
-                          src={image.url}
-                          alt={image.caption || `Gallery image ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {image.caption && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 text-xs">
-                            {image.caption}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border-2 border-blue-200 space-y-3">
-                <h3 className="text-lg font-bold text-blue-900">Package Summary</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Items</p>
-                    <p className="text-2xl font-bold text-blue-900">{getTotalItems()}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Categories</p>
-                    <p className="text-2xl font-bold text-blue-900">
-                      {new Set(cartItems.map((item) => item.category)).size}
-                    </p>
-                  </div>
-                </div>
-                <div className="border-t-2 border-blue-200 pt-3">
-                  <p className="text-sm text-gray-600">Total Price</p>
-                  <p className="text-3xl font-black text-blue-900">${getTotalPrice().toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-white border-t p-6 flex justify-end">
-              <Button onClick={() => setShowPreview(false)}>Close Preview</Button>
             </div>
           </div>
         </div>

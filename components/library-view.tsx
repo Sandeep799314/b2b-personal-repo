@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { SelectCategoryModal } from "@/components/select-category-modal"
 import { toast } from "sonner"
+import { UserWallet } from "./user-wallet"
 // (no additional types required here)
 
 interface ILibraryItem {
@@ -314,22 +315,25 @@ export function LibraryView() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Library Type Tabs (Products view) */}
         <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex space-x-1">
-            {[
-              { id: 'personal', label: 'My Library' },
-              { id: 'public', label: 'Global Library' }
-            ].map((library) => (
-              <Button
-                key={library.id}
-                onClick={() => setActiveLibraryTab(library.id as any)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeLibraryTab === library.id
-                  ? 'bg-yellow-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-              >
-                {library.label}
-              </Button>
-            ))}
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-1">
+              {[
+                { id: 'personal', label: 'My Library' },
+                { id: 'public', label: 'Global Library' }
+              ].map((library) => (
+                <Button
+                  key={library.id}
+                  onClick={() => setActiveLibraryTab(library.id as any)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeLibraryTab === library.id
+                    ? 'bg-yellow-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                  {library.label}
+                </Button>
+              ))}
+            </div>
+            <UserWallet />
           </div>
         </div>
 

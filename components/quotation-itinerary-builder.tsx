@@ -59,6 +59,11 @@ export function QuotationItineraryBuilder({ leadData, onBack, setupConfig }: Quo
       )
 
       if (quotationId) {
+        // Trigger credit deduction animation for new quotation
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 1 } }));
+        }
+
         toast({
           title: "Success",
           description: "Itinerary converted to quotation successfully!",

@@ -14,6 +14,7 @@ import { HtmlEditorBuilder } from "@/components/html-editor-builder"
 import { useToast } from "@/hooks/use-toast"
 import { ArrowLeft, RefreshCw } from "lucide-react"
 import type { ItineraryType } from "@/components/itinerary-setup-modal"
+import { UserWallet } from "@/components/user-wallet"
 
 interface QuotationResponse {
   _id: string
@@ -181,6 +182,7 @@ export function QuotationItineraryEditPage({ quotationId }: QuotationItineraryEd
       itineraryId: quotation.itineraryId,
       onBack: handleReturnToQuotation,
       onSave: async () => { await handleSyncFromItinerary(false) },
+      hideWallet: true,
     }
 
     switch (itineraryType) {
@@ -216,9 +218,9 @@ export function QuotationItineraryEditPage({ quotationId }: QuotationItineraryEd
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-neutral-50 to-brand-primary-50/30">
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopHeader />
+        <TopHeader showWallet={false} />
         <main className="flex-1 overflow-hidden">
-          <div className="flex h-full flex-col">
+          <div className="h-full flex flex-col">
             <div className="flex items-center justify-between border-b bg-white px-6 py-4 shadow-sm">
               <div>
                 <div className="flex items-center gap-3">
@@ -242,21 +244,23 @@ export function QuotationItineraryEditPage({ quotationId }: QuotationItineraryEd
                     Last synced with quotation at {lastSyncedAt.toLocaleTimeString()}
                   </p>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => handleSyncFromItinerary(true)}
-                  disabled={isSyncing}
-                >
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  {isSyncing ? "Syncing..." : "Sync changes"}
-                </Button>
-                <Button onClick={handleReturnToQuotation} disabled={isSyncing}>
-                  Save & Return
-                </Button>
-              </div>
-            </div>
+                </div>
+                <div className="flex items-center gap-4">
+                <div className="h-8 w-px bg-neutral-200" />
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSyncFromItinerary(true)}
+                    disabled={isSyncing}
+                  >
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+                    {isSyncing ? "Syncing..." : "Sync changes"}
+                  </Button>
+                  <Button onClick={handleReturnToQuotation} disabled={isSyncing}>
+                    Save & Return
+                  </Button>
+                </div>
+                </div>            </div>
             <div className="flex-1 overflow-hidden">{renderBuilder()}</div>
           </div>
         </main>

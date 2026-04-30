@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import {
     User as FirebaseUser,
     signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
     GoogleAuthProvider,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -29,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        // Handle redirect result
+        getRedirectResult(auth).catch((error) => {
+            console.error('Error getting redirect result:', error);
+        });
+
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
 
@@ -50,7 +57,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function signInWithGoogle() {
         try {
             const provider = new GoogleAuthProvider();
-            await signInWithPopup(auth, provider);
+            provider.setCustomParameters({
+                prompt: 'select_account'
+            });
+            
+            try {
+                // Try popup first
+                await signInWithPopup(auth, provider);
+            } catch (error: any) {
+                // If popup is blocked or other popup-specific errors, try redirect
+                if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+                    await signInWithRedirect(auth, provider);
+                } else {
+                    throw error;
+                }
+            }
         } catch (error) {
             console.error('Error signing in with Google:', error);
             throw error;

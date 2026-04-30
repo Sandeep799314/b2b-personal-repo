@@ -219,12 +219,15 @@ function ItineraryPageContent() {
       return <ItineraryBuilder itineraryId={itineraryId || undefined} onBack={handleBack} />
     }
 
+    const isSelectMode = searchParams.get('selectForQuotation') === 'true'
+
     return (
       <ItineraryList
         onCreateNew={handleCreateNew}
         onViewItinerary={handleViewItinerary}
         onEditItinerary={handleEditItinerary}
         viewLoadingId={previewLoadingId}
+        selectForQuotation={isSelectMode}
       />
     )
   }
@@ -236,7 +239,7 @@ function ItineraryPageContent() {
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-neutral-50 to-brand-primary-50/30 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopHeader />
+        <TopHeader showWallet={true} />
 
         {/* Back to libraries when navigated from library */}
         {searchParams.get('from') === 'library' && (

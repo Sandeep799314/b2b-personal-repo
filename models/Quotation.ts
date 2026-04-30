@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-import { IItinerary } from "./Itinerary"
+import { IItinerary, ItineraryEventSchema, ItineraryDaySchema } from "./Itinerary"
 
 // Define QuotationPricingOptions interface
 export interface QuotationPricingOptions {
@@ -49,12 +49,31 @@ export interface IQuotation extends Omit<IItinerary, "_id" | "status" | "userId"
     lockedBy?: string
     lockedAt?: Date
     state?: {
-      days: any[]
-      pricingOptions: any
-      subtotal: number
-      markup: number
-      total: number
-      currencySettings: any
+      days?: any[]
+      pricingOptions?: any
+      subtotal?: number
+      markup?: number
+      total?: number
+      currencySettings?: any
+      title?: string
+      description?: string
+      countries?: string[]
+      destination?: string
+      duration?: string
+      totalPrice?: number
+      currency?: string
+      type?: string
+      cartItems?: any[]
+      htmlContent?: string
+      htmlBlocks?: any[]
+      serviceSlots?: any[]
+      branding?: any
+      gallery?: any[]
+      highlights?: string[]
+      images?: string[]
+      overviewEvents?: any[]
+      notes?: string
+      productId?: string
     }
     isDraft?: boolean
   }>
@@ -182,6 +201,172 @@ const QuotationSchema = new mongoose.Schema(
         uploadedAt: { type: Date, required: true },
       },
     ],
+    // Overview events
+    overviewEvents: [ItineraryEventSchema],
+    // Cart/Combo fields
+    cartItems: [
+      {
+        id: { type: String, required: true },
+        productId: { type: String, required: true },
+        name: { type: String, required: true },
+        date: { type: String, required: true }, // Service date: YYYY-MM-DD
+        currency: { type: String, default: "USD" },
+        description: String,
+        category: {
+          type: String,
+          enum: ["activity", "hotel", "flight", "transfer", "meal", "other", "image", "ancillaries"],
+          required: true,
+        },
+        price: { type: Number, required: true },
+        originalPrice: Number,
+        offerTag: String,
+        nights: Number,
+        quantity: { type: Number, default: 1 },
+        addedAt: { type: Date, default: Date.now },
+
+        // Flight specific
+        fromCity: String,
+        toCity: String,
+        airline: String,
+        flightNumber: String,
+        startTime: String,
+        endTime: String,
+        flightClass: String,
+
+        // Hotel specific
+        hotelName: String,
+        location: String,
+        checkIn: String,
+        checkOut: String,
+        roomCategory: String,
+
+        // Transfer specific
+        fromLocation: String,
+        toLocation: String,
+        vehicleType: String,
+        transferType: { type: String, enum: ["private", "shared"] },
+
+        // Activity specific
+        duration: String,
+        difficulty: String,
+
+        // Meal specific
+        mealType: String,
+
+        // Ancillaries specific
+        country: String,
+        visaType: String,
+        visaDuration: String,
+        entryMethod: String,
+        forexCurrency: String,
+        amount: Number,
+        destinations: [String],
+        startDate: String,
+        endDate: String,
+        noOfTravellers: Number,
+        insuranceType: String,
+        sumInsured: Number,
+        insuranceNotes: String,
+        subCategory: String,
+
+        // Image specific
+        imageUrl: String,
+        imageCaption: String,
+
+        // Extended Transfer Fields
+        pickupTime: String,
+        dropTime: String,
+        noOfHours: Number,
+        noOfDays: Number,
+        fuelType: String,
+        carModel: String,
+        transmission: String,
+        pickupDrop: { type: String, enum: ["pickup", "drop"] },
+        busNumber: String,
+        trainNumber: String,
+        transferClass: String,
+        transferLink: String,
+        pnr: String,
+        stopsList: [String],
+        additionalVehicles: [{
+          vehicleType: String,
+          capacity: Number,
+          price: Number
+        }],
+
+        // Extended Hotel Fields
+        adults: Number,
+        children: Number,
+        mealPlan: String,
+        propertyType: String,
+        address: String,
+        hotelLink: String,
+        confirmationNumber: String,
+        amenities: [String],
+        highlights: [String],
+        hotelRating: Number,
+        refundable: String,
+
+        // Extended Flight Fields
+        bookingId: String,
+        seatNumber: String,
+        inFlightMeals: String,
+        checkinBags: Number,
+        checkinBagWeight: String,
+        cabinBags: Number,
+        cabinBagWeight: String,
+        numberOfStops: Number,
+        stopLocations: [String],
+
+        // Extended Others Fields
+        serviceCharge: Number,
+        giftAmount: Number,
+        products: [{
+          name: String,
+          price: Number,
+          description: String,
+          currency: String
+        }],
+
+        // Extended Ancillaries Fields
+        visaCountry: String,
+        entryMethod: String,
+        departureDate: String,
+        returnDate: String,
+        baseCurrency: String,
+        insuranceProvider: String,
+        policyNumber: String,
+        coverageDetails: String,
+      },
+    ],
+    // HTML Editor fields
+    htmlContent: String,
+    htmlBlocks: [
+      {
+        id: { type: String, required: true },
+        type: {
+          type: String,
+          enum: ["heading", "paragraph", "list", "image", "divider", "quote", "table"],
+          required: true,
+        },
+        content: String,
+        level: Number,
+        listType: { type: String, enum: ["ordered", "unordered"] },
+        items: [String],
+        imageUrl: String,
+        imageCaption: String,
+        order: { type: Number, required: true },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
+    // Service Slots for Additional Information
+    serviceSlots: [
+      {
+        id: { type: String },
+        title: { type: String },
+        events: [ItineraryEventSchema],
+      },
+    ],
     branding: {
       headerLogo: String,
       headerText: String,
@@ -232,6 +417,25 @@ const QuotationSchema = new mongoose.Schema(
         markup: { type: Number },
         total: { type: Number },
         currencySettings: { type: mongoose.Schema.Types.Mixed, default: {} },
+        title: { type: String },
+        description: { type: String },
+        countries: { type: [String] },
+        destination: { type: String },
+        duration: { type: String },
+        totalPrice: { type: Number },
+        currency: { type: String },
+        type: { type: String },
+        cartItems: { type: [mongoose.Schema.Types.Mixed] },
+        htmlContent: { type: String },
+        htmlBlocks: { type: [mongoose.Schema.Types.Mixed] },
+        serviceSlots: { type: [mongoose.Schema.Types.Mixed] },
+        branding: { type: mongoose.Schema.Types.Mixed },
+        gallery: { type: [mongoose.Schema.Types.Mixed] },
+        highlights: { type: [String] },
+        images: { type: [String] },
+        overviewEvents: { type: [mongoose.Schema.Types.Mixed] },
+        notes: { type: String },
+        productId: { type: String },
       },
     }],
     currentVersion: { type: Number, default: 1 },
