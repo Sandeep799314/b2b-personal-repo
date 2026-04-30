@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     const collectionId = typeof cleanData.libraryCollection === 'string'
       ? cleanData.libraryCollection
-      : cleanData.libraryCollection?._id
+      : (cleanData.libraryCollection as any)?._id
 
     if (!collectionId || !mongoose.Types.ObjectId.isValid(collectionId)) {
       return NextResponse.json({ error: 'Invalid library id supplied' }, { status: 400 })
