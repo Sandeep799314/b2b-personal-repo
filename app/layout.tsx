@@ -6,6 +6,7 @@ import { AuthProvider } from '@/lib/firebase/auth-context'
 import { AuthGuard } from '@/components/auth-guard'
 import { Toaster } from '@/components/ui/toaster'
 import { UniversalChatbot } from '@/components/universal-chatbot'
+import { Suspense } from 'react'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -40,7 +41,9 @@ html {
           </AuthGuard>
         </AuthProvider>
         <Toaster />
-        <UniversalChatbot />
+        <Suspense fallback={null}>
+          <UniversalChatbot />
+        </Suspense>
       </body>
     </html>
   )
