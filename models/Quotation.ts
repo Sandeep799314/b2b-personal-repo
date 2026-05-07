@@ -24,7 +24,8 @@ export interface IQuotation extends Omit<IItinerary, "_id" | "status" | "userId"
   subtotal?: number // Base price before markup
   markup?: number // Calculated markup amount
   total?: number // Final total after markup
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired"
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "locked"
+  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback"
   validUntil?: Date
   client: {
     name: string
@@ -104,8 +105,13 @@ const QuotationSchema = new mongoose.Schema(
     currency: { type: String, default: "USD" },
     status: {
       type: String,
-      enum: ["draft", "sent", "accepted", "rejected", "expired"],
+      enum: ["draft", "sent", "accepted", "rejected", "expired", "locked"],
       default: "draft",
+    },
+    queryStatus: {
+      type: String,
+      enum: ["pending", "completed", "closed", "cancelled", "awaiting_feedback"],
+      default: "pending",
     },
     type: {
       type: String,
@@ -203,6 +209,7 @@ const QuotationSchema = new mongoose.Schema(
     ],
     // Overview events
     overviewEvents: [ItineraryEventSchema],
+    fixedScheduleEvents: [ItineraryEventSchema],
     // Cart/Combo fields
     cartItems: [
       {
@@ -367,7 +374,43 @@ const QuotationSchema = new mongoose.Schema(
         events: [ItineraryEventSchema],
       },
     ],
+    // Guest Details
+    guestDetails: {
+      name: String,
+      leadReferenceCode: String,
+      email: String,
+      mobile: String,
+    },
+    // Agency Details
+    agencyDetails: {
+      logo: String,
+      name: String,
+      address: String,
+      phone: String,
+      email: String,
+      gst: String,
+    },
+    // Header/Footer Settings
+    headerFooter: {
+      headerImage: String,
+      footerImage: String,
+      contactInfo: String,
+      showOnAllPages: Boolean,
+    },
     branding: {
+      logo: String,
+      companyName: String,
+      contactEmail: String,
+      contactPhone: String,
+      address: String,
+      socialLinks: {
+        instagram: String,
+        whatsapp: String,
+        facebook: String,
+        twitter: String,
+        youtube: String,
+        website: String,
+      },
       headerLogo: String,
       headerText: String,
       footerLogo: String,
@@ -434,6 +477,10 @@ const QuotationSchema = new mongoose.Schema(
         highlights: { type: [String] },
         images: { type: [String] },
         overviewEvents: { type: [mongoose.Schema.Types.Mixed] },
+        fixedScheduleEvents: { type: [mongoose.Schema.Types.Mixed] },
+        guestDetails: { type: mongoose.Schema.Types.Mixed },
+        agencyDetails: { type: mongoose.Schema.Types.Mixed },
+        headerFooter: { type: mongoose.Schema.Types.Mixed },
         notes: { type: String },
         productId: { type: String },
       },

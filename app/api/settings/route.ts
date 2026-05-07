@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
             settings = {
                 type: "global",
                 currency: { baseCurrency: "INR", rates: {}, isManual: false },
-                branding: {}
+                branding: {},
+                companies: []
             }
         }
 
@@ -39,7 +40,8 @@ export async function POST(request: NextRequest) {
             {
                 $set: {
                     currency: data.currency,
-                    branding: data.branding
+                    branding: data.branding,
+                    companies: data.companies
                 }
             },
             { upsert: true, new: true, setDefaultsOnInsert: true }

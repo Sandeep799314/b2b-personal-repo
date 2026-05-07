@@ -51,6 +51,7 @@ function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, ava
     description: "",
     shareType: "individual" as "individual" | "collection",
     itineraryId: "",
+    productId: "",
     itineraryIds: [] as string[],
     expiresAt: "",
     expiryMessage: "", // Custom message when link expires
@@ -179,6 +180,7 @@ function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, ava
         description: initialShare.description || "",
         shareType: initialShare.shareType,
         itineraryId: initialShare.shareType === "individual" ? ((initialShare.itineraryId as any)?._id || initialShare.itineraryId || (initialShare.itinerary as any)?._id || "") : "",
+        productId: initialShare.productId || "",
         itineraryIds: initialShare.shareType === "collection" ? ((initialShare.itineraryIds as any[])?.map((i: any) => i._id || i) || (initialShare.itineraries as any[])?.map((i: any) => i._id || i) || []) : [],
         expiresAt: initialShare.expiresAt ? new Date(initialShare.expiresAt).toISOString().slice(0, 16) : "",
         expiryMessage: initialShare.expiryMessage || "",
@@ -307,6 +309,7 @@ function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, ava
           description: "",
           shareType: "individual",
           itineraryId: "",
+          productId: "",
           itineraryIds: [],
           expiresAt: "",
           expiryMessage: "",
@@ -467,23 +470,56 @@ function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, ava
           {/* Itinerary Selection */}
           <div className="space-y-4">
             {formData.shareType === "individual" ? (
-              <div>
-                <Label htmlFor="itinerary">Select Itinerary *</Label>
-                <Select
-                  value={formData.itineraryId}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, itineraryId: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose an itinerary" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableItineraries.map((itinerary) => (
-                      <SelectItem key={itinerary._id} value={itinerary._id!}>
-                        {itinerary.title} ({itinerary.type})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="itinerary">Select Itinerary *</Label>
+                  <Select
+                    value={formData.itineraryId}
+                    onValueChange={(value) => {
+                      const selectedItinerary = availableItineraries.find(i => i._id === value);
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        itineraryId: value,
+                        productId: selectedItinerary?.productId || prev.productId 
+                      }))
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose an itinerary" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableItineraries.map((itinerary) => (
+                        <SelectItem key={itinerary._id} value={itinerary._id!}>
+                          {itinerary.title} ({itinerary.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="product">Select Product (Optional)</Label>
+                  <Select
+                    value={formData.productId}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, productId: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Get unique product IDs from available itineraries */}
+                      {Array.from(new Set(availableItineraries
+                        .map(i => i.productId)
+                        .filter(id => id && id.trim() !== "")
+                      )).map((id) => (
+                        <SelectItem key={id} value={id!}>
+                          {id}
+                        </SelectItem>
+                      ))}
+                      {/* Allow manual entry if needed? For now just from list */}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             ) : (
               <div>
@@ -1461,6 +1497,12 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
                       {!share.isActive && (
                         <Badge variant="destructive">Inactive</Badge>
                       )}
+                      {/* Product ID Badge */}
+                      {share.productId && (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {share.productId}
+                        </Badge>
+                      )}
                       {/* Markup Badge */}
                       {share.pricingOptions && share.pricingOptions.markupValue > 0 && (
                         <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
@@ -1496,11 +1538,18 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
                     {/* Itinerary Preview */}
                     <div className="space-y-2">
                       {share.shareType === "individual" && share.itinerary ? (
-                        <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                          <span className="text-sm font-medium">{share.itinerary.title}</span>
-                          <Badge className={getTypeColor(share.itinerary.type)} variant="secondary">
-                            {share.itinerary.type}
-                          </Badge>
+                        <div className="flex flex-col gap-1 p-2 bg-gray-50 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{share.itinerary.title}</span>
+                            <Badge className={getTypeColor(share.itinerary.type)} variant="secondary">
+                              {share.itinerary.type}
+                            </Badge>
+                          </div>
+                          {share.productId && (
+                            <div className="text-xs text-gray-500 font-medium">
+                              Product: <span className="text-blue-600">{share.productId}</span>
+                            </div>
+                          )}
                         </div>
                       ) : share.shareType === "collection" && share.itineraries ? (
                         <div className="space-y-1">

@@ -126,7 +126,7 @@ function ItineraryPageContent() {
     router.replace('/itinerary')
   }
 
-  const handlePreviewConfirm = (config: PreviewConfig) => {
+  const handlePreviewConfirm = async (config: PreviewConfig) => {
     if (!previewItinerary) {
       toast({
         title: 'Preview unavailable',
@@ -151,6 +151,39 @@ function ItineraryPageContent() {
         localStorage.setItem("last-preview-itinerary-type", previewItinerary.type || "customized-package")
       }
 
+      // Handle branding/company selection
+      let effectiveBranding = previewItinerary.branding || {}
+      
+      if (config.companyId) {
+        try {
+          const settingsRes = await fetch("/api/settings")
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json()
+            const selected = (settingsData.companies || []).find((c: any) => c.id === config.companyId)
+            if (selected) {
+              effectiveBranding = {
+                ...selected,
+                socialLinks: selected.socialLinks || {}
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch selected company branding:", err)
+        }
+      } else if (!effectiveBranding.companyName) {
+         try {
+          const settingsRes = await fetch("/api/settings")
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json()
+            if (settingsData.branding) {
+              effectiveBranding = settingsData.branding
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch global branding defaults:", err)
+        }
+      }
+
       const previewData = {
         title: previewItinerary.title || 'Untitled Itinerary',
         description: previewItinerary.description || '',
@@ -161,7 +194,7 @@ function ItineraryPageContent() {
           'Multiple Destinations',
         days,
         nights: totalNights,
-        branding: previewItinerary.branding || {},
+        branding: effectiveBranding,
         totalPrice: totalPriceFromEvents || previewItinerary.totalPrice || 0,
         generatedAt: formatGeneratedAt(new Date()),
         additionalSections: previewItinerary.additionalSections || {},

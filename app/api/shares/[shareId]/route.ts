@@ -84,6 +84,7 @@ export async function PUT(
 
     if (body.title !== undefined) updateData.title = body.title
     if (body.description !== undefined) updateData.description = body.description
+    if (body.productId !== undefined) updateData.productId = body.productId
 
     // Enable Updating Share Type & Dependencies
     if (body.shareType !== undefined) updateData.shareType = body.shareType

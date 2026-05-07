@@ -211,7 +211,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-neutral-50 text-neutral-900 font-sans;
+    @apply bg-white text-neutral-900 font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
@@ -751,5 +751,27 @@
   background: #6b7280;
   background-clip: padding-box;
   border: 2px solid #e5e7eb;
+}
+
+/* Manual Event Highlight - Overrides backgrounds and borders for manually created items */
+.manual-event-pink [class*="bg-white"],
+.manual-event-pink [class*="bg-blue-50"],
+.manual-event-pink [class*="bg-green-50"],
+.manual-event-pink [class*="bg-purple-50"],
+.manual-event-pink [class*="bg-orange-50"],
+.manual-event-pink [class*="bg-yellow-50"],
+.manual-event-pink [class*="bg-amber-50"] {
+  background-color: #fffbff !important; /* Extremely subtle pink tint */
+  border-left: 3px solid #ec4899 !important; /* Professional pink accent bar */
+}
+
+.manual-event-pink [class*="border-gray-200"],
+.manual-event-pink [class*="border-blue-200"],
+.manual-event-pink [class*="border-green-200"],
+.manual-event-pink [class*="border-purple-200"],
+.manual-event-pink [class*="border-orange-200"],
+.manual-event-pink [class*="border-yellow-200"],
+.manual-event-pink [class*="border-amber-200"] {
+  border-color: #fbcfe8 !important; /* Subtle pink border */
 }
 

@@ -1038,7 +1038,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
                 ) : (
                   <Save className="mr-2 h-3.5 w-3.5" />
                 )}
-                {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+                {isSaving ? "Saving..." : showSaved ? "Saved" : "Save as Draft"}
               </Button>
             </div>
           </div>
@@ -1105,7 +1105,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
               </Button>
             </div>
 
-            {/* Details Button */}
+            {/* Agency Details Button */}
             <Button
               variant="ghost"
               size="sm"
@@ -1115,7 +1115,7 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
               <span className="hidden sm:inline-block">
                 <Info className="h-3.5 w-3.5" />
               </span>
-              Details
+              Agency Details
             </Button>
 
             {/* Switch Group: Detailed, Dates, Pricing */}

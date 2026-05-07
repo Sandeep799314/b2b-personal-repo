@@ -406,10 +406,20 @@ export function MinimalistTemplate({ itinerary, showPrices, showItemizedPrices =
         return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
     }
 
+    const headerImage = itinerary.headerFooter?.headerImage || itinerary.branding?.headerImage
+    const footerImage = itinerary.headerFooter?.footerImage || itinerary.branding?.footerImage
+
     return (
         <div className="w-full bg-white text-slate-800 font-sans selection:bg-slate-100">
             {/* ------------------- HEADER ------------------- */}
-            <header className="flex justify-between items-start pb-8 pt-4 border-b border-slate-100 mb-8 break-inside-avoid">
+            <header 
+                className="flex justify-between items-start pb-8 pt-8 px-8 border-b border-slate-100 mb-8 break-inside-avoid relative"
+                style={{
+                    backgroundImage: headerImage ? `linear-gradient(rgba(255, 255, 255, 0.93), rgba(255, 255, 255, 0.93)), url(${headerImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
+            >
                 <div className="text-left space-y-2 max-w-lg">
                     <h1 className="text-3xl font-serif font-medium text-slate-900 leading-tight">
                         {itinerary.title}
@@ -627,7 +637,15 @@ export function MinimalistTemplate({ itinerary, showPrices, showItemizedPrices =
             )}
 
             {/* ------------------- FOOTER ------------------- */}
-            <footer className="mt-16 pt-8 border-t-2 border-slate-200 break-inside-avoid bg-slate-50/30">
+            <footer 
+                className="mt-16 pt-12 pb-8 px-8 border-t-2 border-slate-200 break-inside-avoid relative"
+                style={{
+                    backgroundImage: footerImage ? `linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), url(${footerImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    textShadow: footerImage ? "0 1px 2px rgba(255,255,255,0.8)" : "none"
+                }}
+            >
                 <div className="flex flex-col md:flex-row justify-between items-start gap-8 mb-8">
                     <div className="text-left space-y-3 flex-1">
                         <p className="text-base font-serif font-bold text-slate-900">

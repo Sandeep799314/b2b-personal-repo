@@ -29,6 +29,10 @@ const snapshotQuotationState = (q: any) => {
     highlights: q.highlights || [],
     images: q.images || [],
     overviewEvents: q.overviewEvents || [],
+    fixedScheduleEvents: q.fixedScheduleEvents || [],
+    guestDetails: q.guestDetails || {},
+    agencyDetails: q.agencyDetails || {},
+    headerFooter: q.headerFooter || {},
     notes: q.notes || "",
     productId: q.productId || "",
     productReferenceCode: q.productReferenceCode || ""

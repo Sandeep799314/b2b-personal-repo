@@ -55,34 +55,28 @@ export function UserWallet() {
   if (credits === null) return null;
 
   return (
-    <Card className="flex items-center gap-3 px-4 py-2 bg-gradient-to-r from-brand-primary-50 to-white border-brand-primary-100 shadow-sm transition-all hover:shadow-md no-print relative overflow-visible">
+    <div className="flex items-center gap-2 px-3 h-9 bg-white border border-slate-200 rounded-md shadow-sm no-print relative overflow-visible group hover:border-brand-primary-200 transition-all">
       {/* Deduction Animation */}
       {showAnimation && deduction && (
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 animate-float-up-fade pointer-events-none z-50">
-          <span className="text-xl font-extrabold text-red-600 drop-shadow-sm whitespace-nowrap bg-white/80 px-2 py-0.5 rounded-full border border-red-100 flex items-center gap-1">
-            -{deduction} <span className="text-xs uppercase">Credits</span>
+          <span className="text-sm font-bold text-red-600 bg-white px-2 py-0.5 rounded-full border border-red-100 flex items-center gap-1 shadow-sm">
+            -{deduction} <span className="text-[10px] uppercase">Credits</span>
           </span>
         </div>
       )}
       
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-brand-primary-500 text-white">
-        <Wallet className="w-4 h-4" />
+      <Wallet className="w-4 h-4 text-brand-primary-500" />
+      <div className="flex items-center gap-1.5 border-r border-slate-100 pr-2 mr-0.5">
+        <span className="text-sm font-bold text-slate-900">{credits}</span>
+        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-tight">Credits</span>
       </div>
-      <div className="flex flex-col">
-        <span className="text-[10px] font-medium text-neutral-500 uppercase tracking-wider">Your Balance</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-lg font-bold text-neutral-900">{credits}</span>
-          <span className="text-xs font-semibold text-brand-primary-600">Credits</span>
-        </div>
-      </div>
-      <div className="ml-auto">
-        <button 
-          className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-400 transition-colors"
-          title="Add Credits"
-        >
-          <PlusCircle className="w-4 h-4" />
-        </button>
-      </div>
-    </Card>
+      
+      <button 
+        className="p-1 rounded-sm hover:bg-slate-50 text-slate-400 hover:text-brand-primary-600 transition-colors"
+        title="Add Credits"
+      >
+        <PlusCircle className="w-3.5 h-3.5" />
+      </button>
+    </div>
   );
 }

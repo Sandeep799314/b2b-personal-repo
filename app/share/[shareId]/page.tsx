@@ -295,6 +295,10 @@ export default function PublicSharePage() {
           return itineraryBranding.primaryColor
         case 'companyName':
           return itineraryBranding.headerText
+        case 'headerImage':
+          return itineraryBranding.headerImage
+        case 'footerImage':
+          return itineraryBranding.footerImage
         default:
           return undefined
       }
@@ -306,9 +310,12 @@ export default function PublicSharePage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header
-        className="bg-white shadow-sm border-b"
+        className="shadow-sm border-b"
         style={{
           backgroundColor: getBrandingProp('primaryColor') || "#ffffff",
+          backgroundImage: getBrandingProp('headerImage') ? `linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(${getBrandingProp('headerImage')})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
           color: getBrandingProp('primaryColor') ? "#ffffff" : "#1f2937"
         }}
       >
@@ -379,7 +386,16 @@ export default function PublicSharePage() {
 
       {/* Footer */}
       {shareData.settings.showContactInfo && getBrandingProp('companyName') && (
-        <footer className="bg-white border-t mt-12">
+        <footer 
+          className="border-t mt-12"
+          style={{
+            backgroundImage: getBrandingProp('footerImage') ? `linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), url(${getBrandingProp('footerImage')})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundColor: 'white',
+            textShadow: getBrandingProp('footerImage') ? "0 1px 2px rgba(255,255,255,0.8)" : "none"
+          }}
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">{getBrandingProp('companyName')}</h3>
@@ -1431,4 +1447,5 @@ function CollectionView({
       )}
     </div>
   )
+}
 }

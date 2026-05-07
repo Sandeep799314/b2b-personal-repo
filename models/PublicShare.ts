@@ -9,6 +9,7 @@ export interface IPublicShare {
   shareType: "individual" | "collection"
   // For individual sharing
   itineraryId?: string
+  productId?: string // Associated product ID
   // For collection sharing
   itineraryIds?: string[]
   createdBy: string
@@ -112,6 +113,7 @@ const publicShareSchema = new mongoose.Schema({
     ref: "Itinerary",
     required: function (this: IPublicShare) { return this.shareType === "individual" }
   },
+  productId: { type: String },
   itineraryIds: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Itinerary",

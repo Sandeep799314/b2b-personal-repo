@@ -46,6 +46,8 @@ import {
   MessageCircle,
   Mail,
   LayoutGrid,
+  CheckCircle2,
+  Pencil,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EventCard } from "./event-card"
@@ -92,6 +94,7 @@ interface ItineraryBuilderProps {
   initialBranding?: any
   initialGallery?: IGalleryItem[]
   initialOverviewEvents?: IItineraryEvent[]
+  initialFixedScheduleEvents?: IItineraryEvent[]
   initialServiceSlots?: any[]
   initialNotes?: string
   initialHighlights?: string[]
@@ -100,6 +103,9 @@ interface ItineraryBuilderProps {
   initialCartItems?: any[]
   initialHtmlContent?: string
   initialHtmlBlocks?: any[]
+  initialGuestDetails?: any
+  initialAgencyDetails?: any
+  initialHeaderFooter?: any
   hideWallet?: boolean
 }
 
@@ -125,7 +131,7 @@ const COMPONENT_TEMPLATES = [
     category: "flight",
     title: "Flight",
     icon: Plane,
-    color: "bg-orange-50 border-orange-200",
+    color: "bg-white border-orange-200",
   },
   {
     category: "transfer",
@@ -180,7 +186,7 @@ const COMPONENT_TEMPLATES = [
     category: "ancillaries",
     title: "Ancillaries",
     icon: CreditCard,
-    color: "bg-amber-50 border-amber-200",
+    color: "bg-white border-amber-200",
   },
   {
     category: "others",
@@ -195,6 +201,18 @@ const COMPONENT_TEMPLATES = [
     color: "bg-yellow-100 border-yellow-300",
   },
   {
+    category: "fixed-schedule",
+    title: "Fixed Dates",
+    icon: Calendar,
+    color: "bg-indigo-50 border-indigo-200",
+  },
+  {
+    category: "availability-calendar",
+    title: "Availability Calendar",
+    icon: Calendar, // Using Calendar as CalendarRange might not be imported, I'll check imports later if needed
+    color: "bg-emerald-50 border-emerald-200",
+  },
+  {
     category: "additionalInformation",
     title: "Additional Information",
     icon: Info,
@@ -203,7 +221,7 @@ const COMPONENT_TEMPLATES = [
 ]
 
 export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
-  ({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions, onHasChangesChange, readOnly = false, initialDays, initialPricingOptions, initialTitle, initialDescription, initialCountries, initialProductReferenceCode, initialProductId, initialBranding, initialGallery, initialOverviewEvents, initialServiceSlots, initialNotes, initialHighlights, initialImages, initialType, initialCartItems, initialHtmlContent, initialHtmlBlocks, hideWallet = false }, ref) => {
+  ({ itineraryId, quotationId, mode = "itinerary", onBack, onSave, extraActions, onHasChangesChange, readOnly = false, initialDays, initialPricingOptions, initialTitle, initialDescription, initialCountries, initialProductReferenceCode, initialProductId, initialBranding, initialGallery, initialOverviewEvents, initialFixedScheduleEvents, initialServiceSlots, initialNotes, initialHighlights, initialImages, initialType, initialCartItems, initialHtmlContent, initialHtmlBlocks, initialGuestDetails, initialAgencyDetails, initialHeaderFooter, hideWallet = false }, ref) => {
   // library items disabled in this builder
   const { createItinerary, updateItinerary } = useItineraries()
   const { toast } = useToast()
@@ -211,10 +229,79 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
   const isNewMode = searchParams.get('mode') === 'new'
   const itineraryTypeParam = searchParams.get('type') || 'customized-package'
+  
+  // All state declarations moved to the top
   const [currentItineraryId, setCurrentItineraryId] = useState<string | null>(itineraryId || null)
-
-  // All state declarations in one place
   const [days, setDays] = useState<IItineraryDay[]>(initialDays || [{ ...EMPTY_DAY, events: [] }])
+  const [guestDetails, setGuestDetails] = useState<any>(initialGuestDetails || {})
+  const [agencyDetails, setAgencyDetails] = useState<any>(initialAgencyDetails || {})
+  const [headerFooter, setHeaderFooter] = useState<any>(initialHeaderFooter || {})
+  const [title, setTitle] = useState(initialTitle || "New Itinerary")
+  const [description, setDescription] = useState(initialDescription || "")
+  const [isDetailedView, setIsDetailedView] = useState(true)
+
+  const [showDates, setShowDates] = useState(true)
+  const [serviceSlots, setServiceSlots] = useState<Array<{ id: string; title: string; events: IItineraryEvent[] }>>(initialServiceSlots || [])
+  const [overviewEvents, setOverviewEvents] = useState<IItineraryEvent[]>(initialOverviewEvents || [])
+  const [fixedScheduleEvents, setFixedScheduleEvents] = useState<IItineraryEvent[]>(initialFixedScheduleEvents || [])
+  const [editingEvent, setEditingEvent] = useState<{
+    event: IItineraryEvent
+    dayIndex: number
+    eventIndex: number
+  } | null>(null)
+  const [productId, setProductId] = useState(`ITN-${Date.now().toString(36).toUpperCase()}`)
+  const [productReferenceCode, setProductReferenceCode] = useState(initialProductReferenceCode || "")
+  const [branding, setBranding] = useState<any>(initialBranding || {})
+  const [countries, setCountries] = useState<string[]>(initialCountries || [])
+  const [countryError, setCountryError] = useState<string>("")
+  const [gallery, setGallery] = useState<IGalleryItem[]>(initialGallery || [])
+  const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set())
+  const [pricingEnabled, setPricingEnabled] = useState<boolean>(false)
+  const [pricingDialogOpen, setPricingDialogOpen] = useState<boolean>(false)
+  const [pricingAdults, setPricingAdults] = useState<number>(2)
+  const [pricingChildren, setPricingChildren] = useState<number>(0)
+  const [pricingRooms, setPricingRooms] = useState<number>(1)
+  const [pricingNationality, setPricingNationality] = useState<string>('Indian')
+  const [pricingCurrency, setPricingCurrency] = useState<string>('INR')
+  const [pricingMode, setPricingMode] = useState<'individual' | 'total-only'>('individual')
+  const [pricingStartDate, setPricingStartDate] = useState<string>("")
+  const [pricingEndDate, setPricingEndDate] = useState<string>("")
+  const [useManualTotal, setUseManualTotal] = useState<boolean>(false)
+  const [manualTotalPrice, setManualTotalPrice] = useState<string>("")
+  const [quotationPricingOptions, setQuotationPricingOptions] = useState<QuotationPricingOptions>({
+    markupType: "percentage",
+    markupValue: 0,
+    showIndividualPrices: true,
+    showSubtotals: true,
+    showTotal: true,
+    currency: "USD",
+    finalTotalPrice: 0,
+    originalTotalPrice: 0
+  })
+  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
+  const [duplicateDialogMessage, setDuplicateDialogMessage] = useState("")
+  const [validationErrorOpen, setValidationErrorOpen] = useState(false)
+  const [validationErrorMessage, setValidationErrorMessage] = useState("")
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
+  const [deletingDayIndex, setDeletingDayIndex] = useState<number | null>(null)
+  const [newHighlight, setNewHighlight] = useState<string>("")
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'itinerary' | 'all-inclusions'>('itinerary')
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+  const [markupType, setMarkupType] = useState<"percentage" | "amount">("amount")
+  const [markupValue, setMarkupValue] = useState<number>(0)
+  const [itineraryType, setItineraryType] = useState<string>(initialType || itineraryTypeParam || "customized-package")
+  const [cartItems, setCartItems] = useState<any[]>(initialCartItems || [])
+  const [htmlContent, setHtmlContent] = useState<string>(initialHtmlContent || "")
+  const [htmlBlocks, setHtmlBlocks] = useState<any[]>(initialHtmlBlocks || [])
+  const [notes, setNotes] = useState<string>(initialNotes || "")
+  const [highlights, setHighlights] = useState<string[]>(initialHighlights || [])
+  const [images, setImages] = useState<string[]>(initialImages || [])
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
+  
+  const isInitialLoad = useRef(true)
   
   // Sync state when initial props change (e.g. version change)
   useEffect(() => {
@@ -282,6 +369,12 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }, [initialOverviewEvents])
 
   useEffect(() => {
+    if (initialFixedScheduleEvents !== undefined) {
+      setFixedScheduleEvents(initialFixedScheduleEvents || [])
+    }
+  }, [initialFixedScheduleEvents])
+
+  useEffect(() => {
     if (initialServiceSlots !== undefined) {
       setServiceSlots(initialServiceSlots || [])
     }
@@ -328,56 +421,67 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
       setHtmlBlocks(initialHtmlBlocks || [])
     }
   }, [initialHtmlBlocks])
-  const [title, setTitle] = useState(initialTitle || "New Itinerary")
-  const [description, setDescription] = useState(initialDescription || "")
-  const [isDetailedView, setIsDetailedView] = useState(true)
-  const [showDates, setShowDates] = useState(true)
-  const [serviceSlots, setServiceSlots] = useState<Array<{ id: string; title: string; events: IItineraryEvent[] }>>(initialServiceSlots || [])
-  const [overviewEvents, setOverviewEvents] = useState<IItineraryEvent[]>(initialOverviewEvents || [])
 
-  const [editingEvent, setEditingEvent] = useState<{
-    event: IItineraryEvent
-    dayIndex: number
-    eventIndex: number
-  } | null>(null)
-  const [productId, setProductId] = useState(`ITN-${Date.now().toString(36).toUpperCase()}`)
-  const [productReferenceCode, setProductReferenceCode] = useState(initialProductReferenceCode || "")
-  const [branding, setBranding] = useState<any>(initialBranding || {})
-  const [countries, setCountries] = useState<string[]>(initialCountries || [])
-  const [countryError, setCountryError] = useState<string>("")
-  const [gallery, setGallery] = useState<IGalleryItem[]>(initialGallery || [])
-  const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    if (initialGuestDetails !== undefined) {
+      setGuestDetails(initialGuestDetails || {})
+    }
+  }, [initialGuestDetails])
 
-  // Pricing toggle & modal state
-  const [pricingEnabled, setPricingEnabled] = useState<boolean>(false)
-  const [pricingDialogOpen, setPricingDialogOpen] = useState<boolean>(false)
-  const [pricingAdults, setPricingAdults] = useState<number>(2)
-  const [pricingChildren, setPricingChildren] = useState<number>(0)
-  const [pricingRooms, setPricingRooms] = useState<number>(1)
-  const [pricingNationality, setPricingNationality] = useState<string>('Indian')
-  const [pricingCurrency, setPricingCurrency] = useState<string>('INR')
-  // Pricing mode: 'individual' (includes total) or 'total-only'
-  const [pricingMode, setPricingMode] = useState<'individual' | 'total-only'>('individual')
-  // Pricing dates
-  const [pricingStartDate, setPricingStartDate] = useState<string>("")
-  // pricingEndDate is now derived from pricingStartDate + days.length
-  const [pricingEndDate, setPricingEndDate] = useState<string>("")
+  useEffect(() => {
+    if (initialAgencyDetails !== undefined) {
+      setAgencyDetails(initialAgencyDetails || {})
+    }
+  }, [initialAgencyDetails])
 
-  // Manual total pricing
-  const [useManualTotal, setUseManualTotal] = useState<boolean>(false)
-  const [manualTotalPrice, setManualTotalPrice] = useState<string>("")
+  useEffect(() => {
+    if (initialHeaderFooter !== undefined) {
+      setHeaderFooter(initialHeaderFooter || {})
+    }
+  }, [initialHeaderFooter])
 
-  // Quotation specific state
-  const [quotationPricingOptions, setQuotationPricingOptions] = useState<QuotationPricingOptions>({
-    markupType: "percentage",
-    markupValue: 0,
-    showIndividualPrices: true,
-    showSubtotals: true,
-    showTotal: true,
-    currency: "USD",
-    finalTotalPrice: 0,
-    originalTotalPrice: 0
-  })
+  // Fetch global branding if it's missing or empty
+  useEffect(() => {
+    const fetchGlobalBranding = async () => {
+      // Check if branding is missing OR if key details are empty
+      if (!branding || !branding.companyName) {
+        try {
+          const res = await fetch("/api/settings")
+          if (res.ok) {
+            const data = await res.json()
+            if (data.branding) {
+              setBranding(data.branding)
+
+              // Auto-populate agency details if they are currently empty
+              if (!agencyDetails || !agencyDetails.name) {
+                setAgencyDetails({
+                  logo: data.branding.logo || "",
+                  name: data.branding.companyName || "",
+                  address: data.branding.address || "",
+                  phone: data.branding.contactPhone || "",
+                  email: data.branding.contactEmail || "",
+                  gst: data.branding.gst || "",
+                })
+              }
+
+              // Auto-populate header/footer details if they are currently empty
+              if (!headerFooter || (!headerFooter.contactInfo && !headerFooter.headerImage)) {
+                setHeaderFooter({
+                  headerImage: data.branding.headerImage || "",
+                  footerImage: data.branding.footerImage || "",
+                  contactInfo: data.branding.footerText || "",
+                  showOnAllPages: true,
+                })
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to fetch global branding in builder", error)
+        }
+      }
+    }
+    fetchGlobalBranding()
+  }, [initialBranding])
 
   // Update pricingEndDate whenever pricingStartDate or days change
   useEffect(() => {
@@ -391,48 +495,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     }
   }, [pricingStartDate, days.length])
 
-  // Duplicate name dialog
-  const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
-  const [duplicateDialogMessage, setDuplicateDialogMessage] = useState("")
-
-  // Validation error dialog
-  const [validationErrorOpen, setValidationErrorOpen] = useState(false)
-  const [validationErrorMessage, setValidationErrorMessage] = useState("")
-
-  // Delete day confirmation dialog
-  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
-  const [deletingDayIndex, setDeletingDayIndex] = useState<number | null>(null)
-
-  const [highlightOptions, setHighlightOptions] = useState<string[]>([])
-  const [newHighlight, setNewHighlight] = useState<string>("")
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [guestDetails, setGuestDetails] = useState<any>({})
-  const [agencyDetails, setAgencyDetails] = useState<any>({})
-  const [headerFooter, setHeaderFooter] = useState<any>({})
-
-  const [viewMode, setViewMode] = useState<'itinerary' | 'all-inclusions'>('itinerary')
-  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-
-  // Markup state
-  const [markupType, setMarkupType] = useState<"percentage" | "amount">("amount")
-  const [markupValue, setMarkupValue] = useState<number>(0)
-  const [itineraryType, setItineraryType] = useState<string>(initialType || itineraryTypeParam || "customized-package")
-  const [cartItems, setCartItems] = useState<any[]>(initialCartItems || [])
-  const [htmlContent, setHtmlContent] = useState<string>(initialHtmlContent || "")
-  const [htmlBlocks, setHtmlBlocks] = useState<any[]>(initialHtmlBlocks || [])
-  const [notes, setNotes] = useState<string>(initialNotes || "")
-  const [highlights, setHighlights] = useState<string[]>(initialHighlights || [])
-  const [images, setImages] = useState<string[]>(initialImages || [])
+  const highlightOptions = [
+    "Honeymoon",
+    "Family",
+    "Adventure",
+    "Luxury",
+    "Budget",
+    "Beach",
+    "Mountains",
+    "City Tour",
+  ]
 
   useImperativeHandle(ref, () => ({
     save: handleSave,
     handleBackWithCheck,
     hasChanges
   }))
-  const [showExitConfirm, setShowExitConfirm] = useState(false)
-  const isInitialLoad = useRef(true)
 
   // Chatbot event listeners
   useEffect(() => {
@@ -561,7 +639,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               variant: "destructive",
             })
             isInitialLoad.current = false
-            setTimeout(() => router.push("/itinerary"), 2000)
+            setTimeout(() => router.push(mode === "quotation" ? "/quotation-builder" : "/itinerary"), 2000)
             return
           }
 
@@ -595,32 +673,76 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             setMarkupType(itineraryData.markupType || "amount")
             setMarkupValue(itineraryData.markupValue || 0)
             
+            // Set branding if it exists on itinerary
             if (itineraryData.branding && Object.keys(itineraryData.branding).length > 0) {
               setBranding(itineraryData.branding)
-            } else {
-              // Fetch global settings if no branding on itinerary
+            }
+
+            // Determine if we need to fetch defaults from global settings
+            const needsAgencyDefaults = !itineraryData.agencyDetails || !itineraryData.agencyDetails.name;
+            const needsHeaderFooterDefaults = !itineraryData.headerFooter || !itineraryData.headerFooter.headerImage;
+            const needsBrandingDefaults = !itineraryData.branding || !itineraryData.branding.companyName;
+
+            if (needsAgencyDefaults || needsHeaderFooterDefaults || needsBrandingDefaults) {
               try {
                 const settingsRes = await fetch("/api/settings")
                 if (settingsRes.ok) {
                   const settingsData = await settingsRes.json()
                   if (settingsData.branding) {
-                    setBranding(settingsData.branding)
+                    // 1. Populate branding if missing
+                    if (needsBrandingDefaults) {
+                      setBranding(settingsData.branding)
+                    }
+                    
+                    // 2. Auto-populate agency details if missing
+                    if (needsAgencyDefaults) {
+                      setAgencyDetails({
+                        logo: settingsData.branding.logo || "",
+                        name: settingsData.branding.companyName || "",
+                        address: settingsData.branding.address || "",
+                        phone: settingsData.branding.contactPhone || "",
+                        email: settingsData.branding.contactEmail || "",
+                        gst: settingsData.branding.gst || "",
+                      })
+                    }
+
+                    // 3. Auto-populate header/footer if missing
+                    if (needsHeaderFooterDefaults) {
+                      setHeaderFooter({
+                        headerImage: settingsData.branding.headerImage || "",
+                        footerImage: settingsData.branding.footerImage || "",
+                        contactInfo: settingsData.branding.footerText || "",
+                        showOnAllPages: itineraryData.headerFooter?.showOnAllPages ?? true,
+                      })
+                    }
                   }
                 }
               } catch (err) {
                 console.error("Failed to fetch global branding defaults:", err)
               }
             }
+
             setCurrentItineraryId(
               itineraryData._id ? itineraryData._id.toString() : itineraryId ?? null,
             )
             // Load overview events if they exist
             setOverviewEvents(itineraryData.overviewEvents || [])
+            // Load fixed schedule events if they exist
+            setFixedScheduleEvents(itineraryData.fixedScheduleEvents || [])
             // Load service slots (Additional Information) if they exist
             setServiceSlots(itineraryData.serviceSlots || [])
             setGuestDetails(itineraryData.guestDetails || {})
-            setAgencyDetails(itineraryData.agencyDetails || {})
-            setHeaderFooter(itineraryData.headerFooter || {})
+            
+            // Only overwrite agencyDetails if the loaded data is not empty
+            if (itineraryData.agencyDetails && Object.keys(itineraryData.agencyDetails).length > 0) {
+              setAgencyDetails(itineraryData.agencyDetails)
+            }
+            
+            // Only overwrite headerFooter if the loaded data is not empty
+            if (itineraryData.headerFooter && Object.keys(itineraryData.headerFooter).length > 0) {
+              setHeaderFooter(itineraryData.headerFooter)
+            }
+
             setItineraryType(itineraryData.type || "customized-package")
             setCartItems(itineraryData.cartItems || [])
             setHtmlContent(itineraryData.htmlContent || "")
@@ -638,18 +760,19 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             }, 500)
           } else {
             const errorData = await response.json().catch(() => ({}))
-            console.error("[v0] Failed to load itinerary data:", response.statusText, errorData)
+            console.error(`[v0] Failed to load itinerary data (Status: ${response.status}):`, response.statusText, errorData)
             
             // Only show error if it's the initial load or a real ID
             if (isInitialLoad.current) {
+              const errorMessage = errorData?.error || errorData?.message || "Failed to load itinerary data. It might have been deleted.";
               toast({
                 title: "Loading Failed",
-                description: errorData.error || "Failed to load itinerary data. It might have been deleted.",
+                description: errorMessage,
                 variant: "destructive",
               })
               isInitialLoad.current = false
               if (response.status === 404) {
-                setTimeout(() => router.push("/itinerary"), 2000)
+                setTimeout(() => router.push(mode === "quotation" ? "/quotation-builder" : "/itinerary"), 2000)
               }
             }
           }
@@ -684,6 +807,20 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         const refCode = searchParams.get('productReferenceCode') || ''
         setProductReferenceCode(refCode)
 
+        // Reset all itinerary-specific state for new mode
+        setItineraryType(itineraryTypeParam || "customized-package")
+        setOverviewEvents([])
+        setFixedScheduleEvents([])
+        setServiceSlots([])
+        setHighlights([])
+        setImages([])
+        setGallery([])
+        setCartItems([])
+        setHtmlContent("")
+        setHtmlBlocks([])
+        setNotes("")
+        setGuestDetails({})
+
         // Fetch global branding defaults for new itinerary
         try {
           const settingsRes = await fetch("/api/settings")
@@ -691,6 +828,24 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
             const settingsData = await settingsRes.json()
             if (settingsData.branding) {
               setBranding(settingsData.branding)
+              
+              // Auto-populate agency details from global branding for new itinerary
+              setAgencyDetails({
+                logo: settingsData.branding.logo || "",
+                name: settingsData.branding.companyName || "",
+                address: settingsData.branding.address || "",
+                phone: settingsData.branding.contactPhone || "",
+                email: settingsData.branding.contactEmail || "",
+                gst: settingsData.branding.gst || "",
+              })
+
+              // Auto-populate header/footer from global branding for new itinerary
+              setHeaderFooter({
+                headerImage: settingsData.branding.headerImage || "",
+                footerImage: settingsData.branding.footerImage || "",
+                contactInfo: settingsData.branding.footerText || "",
+                showOnAllPages: true,
+              })
             }
           }
         } catch (err) {
@@ -920,15 +1075,61 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
       // Handle drops in Overview section (dayIndex === -2)
       if (dayIndex === -2) {
-        // Only allow notes in overview
-        if (draggedItem.item.category !== "note") {
-          console.log("[DEBUG] Only notes are allowed in Overview section")
+        // Only allow notes and fixed-schedule in overview
+        if (draggedItem.item.category !== "note" && draggedItem.item.category !== "fixed-schedule") {
+          console.log("[DEBUG] Only notes and fixed-schedule are allowed in Overview section")
           setDraggedItem(null)
           setDropTarget(null)
           return
         }
-        // Open modal for note creation in overview
-        console.log("[DEBUG] Opening component source modal for overview note")
+        // Open modal for creation in overview
+        console.log(`[DEBUG] Opening component source modal for overview ${draggedItem.item.category}`)
+        setComponentSourceModal({ isOpen: true, component: draggedItem.item, dropTarget: { dayIndex, position } })
+        return
+      }
+
+      // Handle drops in Fixed Schedule section (dayIndex === -3)
+      if (dayIndex === -3) {
+        // Only allow fixed-schedule, availability-calendar and notes in this section
+        const allowedCategories = ["fixed-schedule", "availability-calendar", "note"]
+        if (!allowedCategories.includes(draggedItem.item.category)) {
+          console.log("[DEBUG] Category not allowed in Fixed Schedule section:", draggedItem.item.category)
+          toast({
+            title: "Not Allowed",
+            description: "Only 'Fixed Schedule', 'Availability Calendar' and 'Notes' components can be added to this section.",
+            variant: "destructive"
+          })
+          setDraggedItem(null)
+          setDropTarget(null)
+          return
+        }
+
+        // SPECIAL CASE: Skip modal for fixed-schedule and create directly
+        if (draggedItem.item.category === "fixed-schedule") {
+          const existingDescription = fixedScheduleEvents.length > 0 ? fixedScheduleEvents[0].description : ""
+          const newEvent: IItineraryEvent = {
+            id: `event-${Date.now()}`,
+            category: "fixed-schedule",
+            title: draggedItem.item.title || "Fixed Dates",
+            description: existingDescription,
+            componentSource: "manual",
+            highlights: [],
+            time: "09:00",
+          }
+          const updatedFixedScheduleEvents = [...fixedScheduleEvents, newEvent]
+          setFixedScheduleEvents(updatedFixedScheduleEvents)
+          setDraggedItem(null)
+          setDropTarget(null)
+          
+          // Auto-open edit modal
+          setEditingEvent({
+            event: newEvent,
+            dayIndex: -3,
+            eventIndex: updatedFixedScheduleEvents.length - 1
+          })
+          return
+        }
+
         setComponentSourceModal({ isOpen: true, component: draggedItem.item, dropTarget: { dayIndex, position } })
         return
       }
@@ -1181,6 +1382,42 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     }
   }
 
+  const handleMoveEvent = (dayIndex: number, eventIndex: number, direction: 'up' | 'down') => {
+    if (dayIndex === -1) return // Skip service slots for now
+
+    let targetEvents: IItineraryEvent[] = []
+    let setEvents: (events: IItineraryEvent[]) => void = () => { }
+
+    if (dayIndex === -2) {
+      targetEvents = [...overviewEvents]
+      setEvents = setOverviewEvents
+    } else if (dayIndex === -3) {
+      targetEvents = [...fixedScheduleEvents]
+      setEvents = setFixedScheduleEvents
+    } else {
+      const newDays = [...days]
+      const events = [...newDays[dayIndex].events]
+      const targetIndex = direction === 'up' ? eventIndex - 1 : eventIndex + 1
+
+      if (targetIndex >= 0 && targetIndex < events.length) {
+        const [movedEvent] = events.splice(eventIndex, 1)
+        events.splice(targetIndex, 0, movedEvent)
+        newDays[dayIndex].events = events
+        setDays(newDays)
+        setHasChanges(true)
+      }
+      return
+    }
+
+    const targetIndex = direction === 'up' ? eventIndex - 1 : eventIndex + 1
+    if (targetIndex >= 0 && targetIndex < targetEvents.length) {
+      const [movedEvent] = targetEvents.splice(eventIndex, 1)
+      targetEvents.splice(targetIndex, 0, movedEvent)
+      setEvents(targetEvents)
+      setHasChanges(true)
+    }
+  }
+
   const handleSaveEvent = (updatedEvent: IItineraryEvent) => {
     console.log("[DEBUG] handleSaveEvent called", {
       editingEventId: editingEvent?.event?.id,
@@ -1210,6 +1447,21 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
       const newOverviewEvents = [...overviewEvents]
       newOverviewEvents[editingEvent.eventIndex] = finalEvent
       setOverviewEvents(newOverviewEvents)
+      setEditingEvent(null)
+      return
+    }
+
+    // Handle fixed schedule events (dayIndex === -3)
+    if (editingEvent.dayIndex === -3) {
+      // Sync remarks (description) across ALL fixed schedule dates
+      const newFixedScheduleEvents = fixedScheduleEvents.map((ev, idx) => {
+        if (idx === editingEvent.eventIndex) return finalEvent;
+        return {
+          ...ev,
+          description: finalEvent.description // Sync remarks
+        };
+      });
+      setFixedScheduleEvents(newFixedScheduleEvents)
       setEditingEvent(null)
       return
     }
@@ -1593,6 +1845,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         title: "Note",
         description: (manualData && manualData.description) || "",
       }),
+      ...(component.category === "fixed-schedule" && {
+        manualDate: manualData && manualData.manualDate,
+        manualDepartureCity: manualData && manualData.manualDepartureCity,
+      }),
       ...(component.category === "others" && {
         subCategory: (manualData && manualData.subCategory) || "",
         serviceCharge: (manualData && manualData.serviceCharge) || 0,
@@ -1631,6 +1887,25 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
       setDraggedItem(null)
       setDropTarget(null)
       setComponentSourceModal({ isOpen: false, component: null, dropTarget: null })
+      return
+    }
+
+    // Handle fixed schedule events (dayIndex === -3)
+    if (dayIndex === -3) {
+      const updatedFixedScheduleEvents = [...fixedScheduleEvents, newEvent]
+      setFixedScheduleEvents(updatedFixedScheduleEvents)
+      setDraggedItem(null)
+      setDropTarget(null)
+      setComponentSourceModal({ isOpen: false, component: null, dropTarget: null })
+      
+      // Auto-open edit modal for fixed-schedule
+      if (newEvent.category === "fixed-schedule") {
+        setEditingEvent({
+          event: newEvent,
+          dayIndex: -3,
+          eventIndex: updatedFixedScheduleEvents.length - 1
+        })
+      }
       return
     }
 
@@ -1745,6 +2020,34 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     }
 
     const converted = convertLibraryItemToEvent(libraryItem)
+    
+    // Handle special sections
+    if (targetDay === -2) {
+      setOverviewEvents([...overviewEvents, converted])
+      setComponentSourceModal({ isOpen: false, component: null, dropTarget: null })
+      setDraggedItem(null)
+      setDropTarget(null)
+      return
+    }
+
+    if (targetDay === -3) {
+      const updatedFixedScheduleEvents = [...fixedScheduleEvents, converted]
+      setFixedScheduleEvents(updatedFixedScheduleEvents)
+      setComponentSourceModal({ isOpen: false, component: null, dropTarget: null })
+      setDraggedItem(null)
+      setDropTarget(null)
+
+      // Auto-open edit modal for fixed-schedule
+      if (converted.category === "fixed-schedule") {
+        setEditingEvent({
+          event: converted,
+          dayIndex: -3,
+          eventIndex: updatedFixedScheduleEvents.length - 1
+        })
+      }
+      return
+    }
+
     const newDays = [...days]
     newDays[targetDay].events.splice(position, 0, converted)
     setDays(newDays)
@@ -1773,16 +2076,25 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const handlePreviewConfirm = async (config: PreviewConfig) => {
     setIsGeneratingPreview(true)
     try {
-      const basePrice = days.reduce(
-        (sum, day) => sum + day.events.reduce((daySum, event) => daySum + (event.price || 0), 0),
+      const basePrice = (days || []).reduce(
+        (sum, day) => sum + (day.events || []).reduce((daySum, event) => daySum + (Number(event.price) || 0), 0),
         0,
       )
 
+      // Use quotationPricingOptions if in quotation mode, otherwise use builder's own markup state
+      let effectiveMarkupType = markupType
+      let effectiveMarkupValue = markupValue
+
+      if (mode === "quotation" && quotationPricingOptions) {
+        effectiveMarkupType = quotationPricingOptions.markupType === "fixed" ? "amount" : "percentage"
+        effectiveMarkupValue = quotationPricingOptions.markupValue
+      }
+
       let totalPrice = basePrice
-      if (markupType === "percentage") {
-        totalPrice = basePrice + (basePrice * markupValue / 100)
+      if (effectiveMarkupType === "percentage") {
+        totalPrice = basePrice + (basePrice * (Number(effectiveMarkupValue) || 0) / 100)
       } else {
-        totalPrice = basePrice + markupValue
+        totalPrice = basePrice + (Number(effectiveMarkupValue) || 0)
       }
 
       const totalNights = days.reduce((sum, day) => sum + (day.nights || 0), 0)
@@ -1797,7 +2109,25 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
       // Ensure branding is populated
       let effectiveBranding = branding
-      if (!effectiveBranding || (!effectiveBranding.companyName && !effectiveBranding.contactEmail)) {
+      
+      // If a specific company was selected in the preview modal
+      if (config.companyId) {
+        try {
+          const settingsRes = await fetch("/api/settings")
+          if (settingsRes.ok) {
+            const settingsData = await settingsRes.json()
+            const selected = (settingsData.companies || []).find((c: any) => c.id === config.companyId)
+            if (selected) {
+              effectiveBranding = {
+                ...selected,
+                socialLinks: selected.socialLinks || {}
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch selected company branding:", err)
+        }
+      } else if (!effectiveBranding || (!effectiveBranding.companyName && !effectiveBranding.contactEmail)) {
         try {
           console.log("Fetching global branding defaults for preview...")
           const settingsRes = await fetch("/api/settings")
@@ -1821,8 +2151,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         nights: totalNights,
         branding: effectiveBranding,
         totalPrice,
-        markupType,
-        markupValue,
+        markupType: effectiveMarkupType,
+        markupValue: effectiveMarkupValue,
         generatedAt: formatDate(new Date()),
         serviceSlots,
         gallery,
@@ -1834,11 +2164,19 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         _id: effectiveItineraryId ? effectiveItineraryId.toString() : undefined,
         itineraryType: itineraryTypeParam,
         currency: pricingCurrency,
+        mode,
+        quotationId
       }
 
       localStorage.setItem("itinerary-preview", JSON.stringify(previewData))
 
-      window.open("/itinerary/preview", "_blank")
+      const previewWindow = window.open("/itinerary/preview", "_blank")
+      if (!previewWindow) {
+        // Fallback for popup blockers
+        router.push("/itinerary/preview")
+      } else {
+        previewWindow.focus()
+      }
 
       toast({
         title: "Preview Generated",
@@ -1859,11 +2197,11 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const handleSave = async () => {
     // VALIDATION FIRST - before setting any state
     const descriptionValue = description ? description.trim() : ""
-    const destinationValue = countries && countries.length > 0 ? (countries[0] ? countries[0].trim() : "") : ""
+    const filteredDestinations = countries.filter(d => d.trim())
 
     console.log("[VALIDATION] Checking fields before save")
     console.log("[VALIDATION] descriptionValue length:", descriptionValue.length)
-    console.log("[VALIDATION] destinationValue length:", destinationValue.length)
+    console.log("[VALIDATION] filteredDestinations length:", filteredDestinations.length)
 
     // Check if description is empty
     if (!descriptionValue || descriptionValue.length === 0) {
@@ -1874,9 +2212,9 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     }
 
     // Check if destination is empty
-    if (!destinationValue || destinationValue.length === 0) {
+    if (filteredDestinations.length === 0) {
       console.log("[VALIDATION] BLOCKED - Destination is empty")
-      setValidationErrorMessage("Please enter a destination before saving.")
+      setValidationErrorMessage("Please enter at least one destination before saving.")
       setValidationErrorOpen(true)
       return
     }
@@ -1955,6 +2293,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         branding,
         serviceSlots,
         overviewEvents, // Include overview events in save data
+        fixedScheduleEvents, // Include fixed schedule events in save data
         guestDetails,
         agencyDetails,
         headerFooter,
@@ -1970,42 +2309,50 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
       let result
       let effectiveItineraryId = currentItineraryId
       
-      // Auto-update matched itinerary instead of duplicating or blocking
-      if (!effectiveItineraryId && itineraryData.title) {
-        try {
-          const dupResp = await fetch(`/api/itineraries?title=${encodeURIComponent(
-            itineraryData.title,
-          )}`, {
-            headers: {
-              "x-request-id": `dup-${Date.now()}`,
-            },
-          })
-
-          if (dupResp.ok) {
-            const dupData = await dupResp.json()
-            const matches = Array.isArray(dupData.data) ? dupData.data : []
-            if (matches.length > 0) {
-              effectiveItineraryId = matches[0]._id
-              setCurrentItineraryId(effectiveItineraryId)
-              window.history.replaceState(null, "", `/itinerary/builder?id=${effectiveItineraryId}&mode=edit&type=${itineraryTypeParam}`)
-              toast({
-                title: "Updating Existing",
-                description: `Updating existing itinerary named "${itineraryData.title}".`,
-              })
-            }
-          }
-        } catch (error) {
-          console.warn("[v0] Duplicate check failed (client-side):", error)
-        }
-      }
-      
-      if (effectiveItineraryId) {
-        result = await updateItinerary(effectiveItineraryId, itineraryData)
+      // CRITICAL FIX: If we are in quotation mode, we should NOT update the source itinerary
+      // Changes should only be saved to the Quotation object via the onSave callback.
+      if (mode === 'quotation') {
+        // Mock a successful result to allow the UI to proceed to onSave
+        result = { _id: effectiveItineraryId || itineraryId }
       } else {
-        result = await createItinerary(itineraryData)
-        // Trigger credit deduction animation for new itinerary
-        if (typeof window !== 'undefined' && result) {
-          window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 2 } }));
+        // Normal itinerary mode - proceed with duplicate check and save
+        // Auto-update matched itinerary instead of duplicating or blocking
+        if (!effectiveItineraryId && itineraryData.title) {
+          try {
+            const dupResp = await fetch(`/api/itineraries?title=${encodeURIComponent(
+              itineraryData.title,
+            )}`, {
+              headers: {
+                "x-request-id": `dup-${Date.now()}`,
+              },
+            })
+
+            if (dupResp.ok) {
+              const dupData = await dupResp.json()
+              const matches = Array.isArray(dupData.data) ? dupData.data : []
+              if (matches.length > 0) {
+                effectiveItineraryId = matches[0]._id
+                setCurrentItineraryId(effectiveItineraryId)
+                window.history.replaceState(null, "", `/itinerary/builder?id=${effectiveItineraryId}&mode=edit&type=${itineraryTypeParam}`)
+                toast({
+                  title: "Updating Existing",
+                  description: `Updating existing itinerary named "${itineraryData.title}".`,
+                })
+              }
+            }
+          } catch (error) {
+            console.warn("[v0] Duplicate check failed (client-side):", error)
+          }
+        }
+        
+        if (effectiveItineraryId) {
+          result = await updateItinerary(effectiveItineraryId, itineraryData)
+        } else {
+          result = await createItinerary(itineraryData)
+          // Trigger credit deduction animation for new itinerary
+          if (typeof window !== 'undefined' && result) {
+            window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 2 } }));
+          }
         }
       }
 
@@ -2057,7 +2404,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }
 
   const autoSave = async (updatedDays?: IItineraryDay[]) => {
-    if (!currentItineraryId) return
+    // CRITICAL FIX: If we are in quotation mode, we should NOT auto-save to the source itinerary
+    if (!currentItineraryId || mode === 'quotation') return
 
     try {
       console.log("[DEBUG] Auto-saving itinerary...")
@@ -2102,6 +2450,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         gallery,
         branding,
         overviewEvents, // Include overview events in auto-save
+        fixedScheduleEvents, // Include fixed schedule events in auto-save
       }
 
       const result = await updateItinerary(currentItineraryId, itineraryData)
@@ -2257,12 +2606,16 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen relative overflow-x-hidden bg-[#f8fafc]">
+    <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen relative overflow-x-hidden bg-white">
       {/* Mobile Sticky Header - ONLY visible on mobile */}
       <div className="lg:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-neutral-200 px-4 py-3 flex items-center justify-between shadow-sm">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Editor Mode</span>
-          <h1 className="text-sm font-bold text-neutral-800 truncate max-w-[180px]">{title || "Untitled Itinerary"}</h1>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleBackWithCheck} className="h-8 w-8 -ml-2">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex flex-col">
+            <h1 className="text-sm font-bold text-neutral-800 truncate max-w-[200px]">{title || "Untitled Itinerary"}</h1>
+          </div>
         </div>
         <div className="flex items-center gap-2">
            {!readOnly && (
@@ -2278,28 +2631,6 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
            )}
         </div>
       </div>
-      {/* Vertical EDITOR MODE strip for customized-package - Hidden on Mobile */}
-      {(itineraryTypeParam === 'customized-package' && (isNewMode || currentItineraryId)) && (
-        <div
-          className={`hidden lg:flex w-7 flex-none items-center justify-center shadow-md relative z-40 ${readOnly ? 'grayscale opacity-50' : ''}`}
-          style={{
-            background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)'
-          }}
-        >
-          <span
-            className="text-white font-bold text-sm tracking-widest whitespace-nowrap uppercase lg:sticky lg:top-1/2 lg:-translate-y-1/2"
-            style={{
-              writingMode: 'vertical-rl',
-              textOrientation: 'mixed',
-              transform: 'rotate(180deg)',
-              letterSpacing: '0.15em'
-            }}
-          >
-            {readOnly ? 'View Mode' : 'Editor Mode'}
-          </span>
-        </div>
-      )}
-
       {/* Floating Mobile Action Bar - ONLY visible on mobile */}
       {!readOnly && (
         <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-neutral-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-2xl border border-white/10 ring-1 ring-black/5">
@@ -2348,51 +2679,46 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         </div>
       )}
 
-      <div className="flex-1 p-2 lg:p-4 overflow-y-auto h-full bg-[#f8fafc] pb-24 lg:pb-4">
-        {/* Professional Header Card */}
+      <div className="flex-1 p-2 lg:p-4 overflow-y-auto h-full bg-white pb-24 lg:pb-4">
+        {/* Top Navigation Row */}
         <div className="bg-white rounded-xl lg:rounded-2xl shadow-sm border border-neutral-200 mb-4 lg:mb-6 p-4 lg:p-6 relative overflow-hidden">
           {/* Subtle Top Accent */}
           <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${readOnly ? 'from-neutral-400 to-neutral-500' : 'from-amber-400 to-yellow-500'}`} />
 
-          <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 lg:gap-6 mb-4 lg:mb-8">
-            <div className="flex-1 space-y-3 lg:space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+            <div className="flex flex-col gap-2 flex-1">
               {/* Title Section */}
-              <div className="group relative">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  readOnly={readOnly}
-                  placeholder="Itinerary Title"
-                  className={`w-full text-xl lg:text-4xl font-black border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all ${readOnly ? 'cursor-default' : ''}`}
-                  style={{ fontWeight: 900 }}
-                  aria-label="Itinerary title"
-                  type="text"
-                  spellCheck={false}
-                />
-                {!readOnly && <div className="h-0.5 w-full bg-neutral-100 mt-2 group-focus-within:bg-amber-400 transition-colors" />}
-              </div>
-
-              {/* Days & Nights Badge Bar */}
-              <div className="flex flex-wrap items-center gap-2 lg:gap-3">
-                <div className="bg-amber-50 text-amber-700 px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full text-[10px] lg:text-xs font-bold uppercase tracking-wider flex items-center border border-amber-100 shadow-sm">
-                  <Sun className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1.5 text-amber-500" />
-                  {days.length} Days
-                  <span className="mx-2 text-amber-200">|</span>
-                  <Moon className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1.5 text-amber-600" />
-                  {days.length > 0 ? days.reduce((sum, d) => sum + (d.nights || 0), 0) || Math.max(0, days.length - 1) : 0} Nights
+              <div className="flex flex-wrap items-center gap-3 w-full">
+                <div className="flex-1 max-w-2xl">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    readOnly={readOnly}
+                    placeholder="Itinerary Title"
+                    className={`w-full text-xl lg:text-4xl font-bold border-none p-0 bg-transparent focus:outline-none focus:ring-0 leading-tight placeholder:text-neutral-200 transition-all ${readOnly ? 'cursor-default' : ''}`}
+                    aria-label="Itinerary title"
+                    type="text"
+                    spellCheck={false}
+                  />
                 </div>
-                <div className="hidden sm:block text-neutral-400 text-[10px] lg:text-xs font-medium bg-white px-2 py-1 rounded-md border border-neutral-100">
-                  {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+
+                {/* Days & Nights Badge Bar - Now smaller and beside title */}
+                <div className="bg-white text-amber-700 px-2 py-0.5 lg:px-2.5 lg:py-1 rounded-full text-[9px] lg:text-[10px] font-bold uppercase tracking-wider flex items-center border border-amber-100 shadow-sm shrink-0">
+                  <Sun className="w-2.5 h-2.5 lg:w-3 lg:h-3 mr-1 text-amber-500" />
+                  {days.length} Days
+                  <span className="mx-1.5 text-amber-200">|</span>
+                  <Moon className="w-2.5 h-2.5 lg:w-3 lg:h-3 mr-1 text-amber-600" />
+                  {days.length > 0 ? days.reduce((sum, d) => sum + (d.nights || 0), 0) || Math.max(0, days.length - 1) : 0} Nights
                 </div>
               </div>
             </div>
 
-            <div className="hidden lg:flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               {!readOnly && (
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving}
-                  className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10`}
+                  className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10 lg:h-12 rounded-xl`}
                 >
                   {isSaving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -2401,89 +2727,84 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                   ) : (
                     <Save className="mr-2 h-4 w-4" />
                   )}
-                  {isSaving ? "Saving..." : showSaved ? "Saved" : "Save Changes"}
+                  {isSaving ? "Saving..." : showSaved ? "Saved" : (mode === 'quotation' ? "Save as Draft" : "Save")}
                 </Button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-            {/* Left Column: Main Info */}
-            <div className="lg:col-span-8 space-y-4 lg:space-y-6">
-              {/* Destination & Reference Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4">
-                <div className={`bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
-                  <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
-                    Destination {!readOnly && <span className="text-red-500">*</span>}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-amber-500" />
-                    <Input
-                      value={countries[0] || ""}
-                      onChange={(e) => setCountries([e.target.value])}
-                      readOnly={readOnly}
-                      className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
-                      placeholder="Where to?"
-                      autoComplete="off"
-                    />
+          {/* Combined Journey Details & Highlights Row */}
+          <div className="mt-6 pt-6 border-t border-neutral-100">
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left Side: Core Details (Destination, Ref, Desc) */}
+              <div className="flex-[2] space-y-4">
+                <div className="flex flex-col md:flex-row gap-4">
+                  {/* Destination */}
+                  <div className={`flex-1 bg-neutral-50 rounded-xl p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
+                      Destination {!readOnly && <span className="text-red-500">*</span>}
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-amber-500" />
+                      <Input
+                        value={countries[0] || ""}
+                        onChange={(e) => setCountries([e.target.value])}
+                        readOnly={readOnly}
+                        className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
+                        placeholder="Where to?"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Product Reference */}
+                  <div className={`flex-1 bg-neutral-50 rounded-xl p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
+                      Product Reference
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-neutral-400" />
+                      <Input
+                        value={productReferenceCode}
+                        onChange={(e) => setProductReferenceCode(e.target.value)}
+                        readOnly={readOnly}
+                        placeholder="Optional Code"
+                        className="flex-1 border-none p-0 h-auto text-sm font-semibold bg-transparent focus-visible:ring-0"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className={`bg-neutral-50 rounded-xl p-2.5 lg:p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
-                  <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1 lg:mb-1.5 block">
-                    Product Reference
+                {/* Description - Now below the first row */}
+                <div className={`bg-neutral-50 rounded-xl p-3 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 block">
+                    Itinerary Description {!readOnly && <span className="text-red-500">*</span>}
                   </label>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-neutral-400" />
-                    <Input
-                      value={productReferenceCode}
-                      onChange={(e) => setProductReferenceCode(e.target.value)}
-                      readOnly={readOnly}
-                      placeholder="Optional Code"
-                      className="flex-1 border-none p-0 h-auto text-xs lg:text-sm font-semibold bg-transparent focus-visible:ring-0"
-                      aria-label="Product Reference Code"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Description Box */}
-              <div className={`bg-neutral-50 rounded-xl p-3 lg:p-4 border border-neutral-100 transition-all ${!readOnly ? 'focus-within:border-amber-200 focus-within:bg-white' : ''}`}>
-                <label className="text-[10px] lg:text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5 lg:mb-2 block">
-                  Itinerary Description {!readOnly && <span className="text-red-500">*</span>}
-                </label>
-                {(() => {
-                  const lines = description ? description.split('\n').length : 1
-                  const rows = Math.min(Math.max(lines, 1), 6)
-                  return (
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-neutral-400 mt-0.5" />
                     <Textarea
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       readOnly={readOnly}
                       placeholder="Describe the journey experience..."
-                      rows={rows}
-                      className="min-h-[50px] lg:min-h-[60px] border-none resize-none p-0 text-sm lg:text-base bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700"
-                      aria-label="Itinerary description"
+                      rows={3}
+                      className="min-h-[80px] border-none resize-none p-0 text-sm bg-transparent focus-visible:ring-0 placeholder:text-neutral-300 leading-relaxed font-medium text-neutral-700 w-full"
                     />
-                  )
-                })()}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            {/* Right Column: Highlights & Tags */}
-            <div className="lg:col-span-4 flex flex-col h-full lg:border-l border-neutral-100 lg:pl-8">
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-3 lg:mb-4">
-                  <h3 className="text-xs lg:text-sm font-bold text-neutral-800 flex items-center gap-2">
-                    <Sun className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-amber-500" />
+              {/* Right Side: Trip Highlights */}
+              <div className="flex-1 bg-neutral-50 rounded-xl p-4 border border-neutral-100 h-full min-h-[160px]">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest block">
                     Trip Highlights
-                  </h3>
-                  <Badge variant="secondary" className="text-[9px] lg:text-[10px] bg-neutral-100 text-neutral-500 border-none">
-                    {highlightOptions.length} TOTAL
+                  </label>
+                  <Badge variant="secondary" className="text-[9px] bg-neutral-200 text-neutral-600 border-none px-1.5 py-0">
+                    {highlightOptions.length}
                   </Badge>
                 </div>
-
-                <div className="flex flex-wrap gap-1 lg:gap-1.5 mb-4 lg:mb-6 max-h-[120px] lg:max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                
+                <div className="flex flex-wrap gap-1.5 mb-4 max-h-[100px] overflow-y-auto custom-scrollbar pr-1">
                   {highlightOptions.map((highlight) => {
                     const isActive = days.some(day =>
                       day.events.some(event => event.highlights?.includes(highlight))
@@ -2492,20 +2813,12 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       <Badge
                         key={highlight}
                         variant="outline"
-                        className={`text-[10px] lg:text-[11px] py-0.5 lg:py-1 px-2 lg:px-2.5 rounded-lg transition-all border shadow-sm ${
+                        className={`text-[9px] py-1 px-2.5 rounded-lg transition-all border shadow-sm ${
                           isActive
-                            ? 'bg-amber-500 text-white border-amber-600'
+                            ? 'bg-white0 text-white border-amber-600'
                             : 'bg-white text-neutral-600 border-neutral-200'
-                        } ${!readOnly ? 'cursor-pointer hover:border-amber-300 hover:bg-amber-50' : 'cursor-default'}`}
+                        } ${!readOnly ? 'cursor-pointer hover:border-amber-300 hover:bg-white' : 'cursor-default'}`}
                         onClick={() => !readOnly && toggleHighlight(highlight)}
-                        role={!readOnly ? "button" : "presentation"}
-                        tabIndex={!readOnly ? 0 : -1}
-                        onKeyDown={(e) => {
-                          if (!readOnly && (e.key === 'Enter' || e.key === ' ')) {
-                            e.preventDefault()
-                            toggleHighlight(highlight)
-                          }
-                        }}
                       >
                         {highlight}
                       </Badge>
@@ -2514,37 +2827,32 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                 </div>
 
                 {!readOnly && (
-                  <div className="mt-auto pt-3 lg:pt-4 border-t border-neutral-50">
-                    <div className="relative group">
-                      <Input
-                        type="text"
-                        placeholder="Add custom highlight..."
-                        value={newHighlight}
-                        onChange={(e) => setNewHighlight(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newHighlight.trim()) {
-                            e.preventDefault()
-                            addHighlight(newHighlight.trim())
-                          }
-                        }}
-                        className="w-full pr-10 lg:pr-12 h-9 lg:h-11 bg-neutral-50 border-neutral-100 focus:bg-white focus:border-amber-300 rounded-lg lg:rounded-xl text-xs lg:text-sm"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (newHighlight.trim()) {
-                            addHighlight(newHighlight.trim())
-                          }
-                        }}
-                        className="absolute right-1 top-1 lg:right-1.5 lg:top-1.5 h-7 w-7 lg:h-8 lg:w-8 p-0 text-amber-600 hover:bg-amber-50"
-                      >
-                        <Plus className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-[9px] lg:text-[10px] text-neutral-400 mt-1.5 lg:mt-2 text-center">
-                      Press Enter to quickly add a new tag
-                    </p>
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Add highlight..."
+                      value={newHighlight}
+                      onChange={(e) => setNewHighlight(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newHighlight.trim()) {
+                          e.preventDefault()
+                          addHighlight(newHighlight.trim())
+                        }
+                      }}
+                      className="w-full pr-8 h-9 bg-white border-neutral-200 focus:border-amber-300 rounded-lg text-[11px]"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        if (newHighlight.trim()) {
+                          addHighlight(newHighlight.trim())
+                        }
+                      }}
+                      className="absolute right-0 top-0 h-9 w-8 p-0 text-amber-600 hover:bg-white"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -2552,9 +2860,13 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </div>
         </div>
 
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Column: Itinerary Details */}
+          <div className="flex-1 space-y-4 min-w-0">
+
         {/* Action Toggles Block - Tab-like for Mobile */}
-        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-4 lg:gap-6">
             {/* Itinerary / Item-wise Group */}
             <div className="flex items-center gap-1 p-1 bg-neutral-100/50 rounded-xl">
               <Button
@@ -2580,8 +2892,10 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                 Item-wise
               </Button>
             </div>
+          </div>
 
-            {/* Details Button */}
+          <div className="flex flex-wrap items-center gap-4 lg:gap-6 ml-auto">
+            {/* Agency Details Button */}
             <Button 
               variant="ghost" 
               size="sm" 
@@ -2589,7 +2903,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               className="h-8 px-3 text-[10px] lg:text-xs font-bold text-black hover:bg-neutral-100 rounded-lg flex items-center gap-1.5 border border-neutral-200"
             >
               <span className="hidden sm:inline-block"><Info className="h-3.5 w-3.5" /></span>
-              Details
+              Agency Details
             </Button>
 
             {/* Switch Group: Detailed, Dates, Pricing */}
@@ -2611,46 +2925,45 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                 <label htmlFor="pricing-v" className={`text-[10px] font-bold uppercase ${readOnly ? 'text-neutral-400' : 'text-black'}`}>Pricing</label>
               </div>
             </div>
-          </div>
 
-          {!readOnly && (
-            <div className="flex items-center gap-1.5 lg:gap-2 ml-4">
-              <select
-                value={pricingCurrency}
-                onChange={(e) => {
-                  const newCurrency = e.target.value
-                  setPricingCurrency(newCurrency)
-                  if (mode === 'quotation') {
-                    setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
-                  }
-                }}
-                className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
-              >
-                <option value="INR">₹ INR</option>
-                <option value="USD">$ USD</option>
-                <option value="EUR">€ EUR</option>
-                <option value="GBP">£ GBP</option>
-                <option value="AED">د.إ AED</option>
-              </select>
-              <Button variant="ghost" size="icon" onClick={handleCreateCopy} disabled={isSaving} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Copy Itinerary">
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Preview Itinerary">
-                {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-              </Button>
-              <div className="w-px h-4 bg-neutral-200 mx-1" />
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Share">
-                <Share2 className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Download PDF">
-                <Download className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
+            {!readOnly && (
+              <div className="flex items-center gap-1.5 lg:gap-2 border-l border-neutral-200 pl-4 lg:pl-6">
+                <select
+                  value={pricingCurrency}
+                  onChange={(e) => {
+                    const newCurrency = e.target.value
+                    setPricingCurrency(newCurrency)
+                    if (mode === 'quotation') {
+                      setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
+                    }
+                  }}
+                  className="h-8 bg-white border border-neutral-200 text-[10px] lg:text-xs font-bold text-black rounded-lg px-2 outline-none cursor-pointer hover:bg-neutral-50"
+                >
+                  <option value="INR">₹ INR</option>
+                  <option value="USD">$ USD</option>
+                  <option value="EUR">€ EUR</option>
+                  <option value="GBP">£ GBP</option>
+                  <option value="AED">د.إ AED</option>
+                </select>
+                <Button variant="ghost" size="icon" onClick={handleCreateCopy} disabled={isSaving} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Copy Itinerary">
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={handlePreview} disabled={isGeneratingPreview} className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Preview Itinerary">
+                  {isGeneratingPreview ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                </Button>
+                <div className="w-px h-4 bg-neutral-200 mx-1" />
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Share">
+                  <Share2 className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg" title="Download PDF">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
-
-          {/* Pricing Info Display Row */}        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 overflow-x-auto custom-scrollbar flex items-center justify-between">
-          <div className="flex items-center gap-4 lg:gap-6 min-w-max">
+        </div>
+          {/* Pricing Info Display Row */}        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 mb-4 p-2 lg:p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-4 lg:gap-6">
             {/* Pax & Room Info */}
             <div className="flex items-center gap-2 p-1 bg-neutral-100/50 rounded-xl px-3 h-9">
               <div className="flex items-center gap-1.5 border-r border-neutral-200 pr-3 mr-1">
@@ -2949,6 +3262,158 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               </CardContent>
             </Card>
 
+            {/* Fixed Dates Card - Appears Below Overview */}
+            <Card
+              className={`relative border-2 ${dropTarget?.dayIndex === -3 ? "border-blue-400" : "border-indigo-200"} bg-white overflow-hidden rounded-xl shadow-sm`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                handleDragOver(-3, fixedScheduleEvents.length)
+              }}
+              onDrop={() => handleDrop(-3, fixedScheduleEvents.length)}
+            >
+              <CardHeader className="pb-2 pt-3 px-3 lg:px-4 bg-indigo-50/30 border-b border-indigo-100">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {fixedScheduleEvents.length > 0 && (
+                      <>
+                        <div className="p-1.5 bg-indigo-100 rounded-lg">
+                          <Calendar className="h-4 w-4 lg:h-5 lg:w-5 text-indigo-600" />
+                        </div>
+                        <h3 className="text-base lg:text-lg font-bold text-indigo-900 tracking-tight uppercase">Fixed Dates</h3>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const existingDescription = fixedScheduleEvents.length > 0 ? fixedScheduleEvents[0].description : "";
+                      const newEvent: IItineraryEvent = {
+                        id: `event-${Date.now()}`,
+                        category: "fixed-schedule",
+                        title: "Fixed Dates",
+                        description: existingDescription,
+                        componentSource: "manual",
+                        highlights: [],
+                        time: "09:00",
+                      }
+                      const updatedFixedScheduleEvents = [...fixedScheduleEvents, newEvent]
+                      setFixedScheduleEvents(updatedFixedScheduleEvents)
+                      setEditingEvent({
+                        event: newEvent,
+                        dayIndex: -3,
+                        eventIndex: updatedFixedScheduleEvents.length - 1,
+                      })
+                    }}
+                    className="text-xs lg:text-sm w-full sm:w-auto h-8 lg:h-9 bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Dates
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-3 px-3 lg:px-4 pb-3">
+                {fixedScheduleEvents.length === 0 ? (
+                  <div className="text-center py-6 px-4 border-2 border-dashed border-indigo-100 rounded-xl bg-gray-50/50">
+                    <p className="text-xs lg:text-sm text-indigo-400 font-medium">
+                      Drag a <strong>Fixed Dates</strong> component here or click <strong>Add Dates</strong>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-start gap-6">
+                    {(() => {
+                      // Group events by month
+                      const sortedEvents = [...fixedScheduleEvents].sort((a, b) => {
+                        const dateA = new Date((a as any).manualDate || a.time || "").getTime()
+                        const dateB = new Date((b as any).manualDate || b.time || "").getTime()
+                        return dateA - dateB
+                      })
+
+                      const groups: { month: string, events: { event: any, index: number }[] }[] = []
+                      sortedEvents.forEach((event) => {
+                        const dateStr = (event as any).manualDate || event.time || ""
+                        let month = "TBD"
+                        if (dateStr) {
+                          try {
+                            const d = new Date(dateStr)
+                            if (!isNaN(d.getTime())) {
+                              month = d.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase()
+                            }
+                          } catch (e) { }
+                        }
+
+                        // Find original index in fixedScheduleEvents for callbacks
+                        const originalIndex = fixedScheduleEvents.findIndex(e => e.id === event.id)
+
+                        const existingGroup = groups.find(g => g.month === month)
+                        if (existingGroup) {
+                          existingGroup.events.push({ event, index: originalIndex })
+                        } else {
+                          groups.push({ month, events: [{ event, index: originalIndex }] })
+                        }
+                      })
+
+                      return groups.map((group, gIdx) => (
+                        <div key={`group-${group.month}-${gIdx}`} className="flex items-start gap-3 bg-neutral-50/50 p-2 rounded-2xl border border-neutral-100">
+                          <div className="flex flex-col items-center justify-center self-stretch px-1.5 border-r-2 border-indigo-200/50 bg-indigo-50/30 rounded-l-xl">
+                            <span className="text-[9px] font-black text-indigo-500 [writing-mode:vertical-lr] rotate-180 uppercase tracking-[0.2em] py-3 whitespace-nowrap">
+                              {group.month}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 lg:gap-3 py-1 pr-1">
+                            {group.events.map(({ event, index }) => (
+                              <div key={`fixed-wrapper-${event.id}-${index}`} className="group relative">
+                                <EventCard
+                                  key={`fixed-${event.id}-${index}`}
+                                  event={event}
+                                  isDetailedView={isDetailedView}
+                                  pricingEnabled={false}
+                                  pricingAdults={0}
+                                  pricingChildren={0}
+                                  pricingCurrency="INR"
+                                  pricingMode="individual"
+                                  onDragStart={() => { }}
+                                  onEdit={() => {
+                                    setEditingEvent({
+                                      dayIndex: -3,
+                                      eventIndex: index,
+                                      event: { ...event }
+                                    })
+                                    setIsEditModalOpen(true)
+                                  }}
+                                  onDelete={() => {
+                                    const newEvents = [...fixedScheduleEvents]
+                                    newEvents.splice(index, 1)
+                                    setFixedScheduleEvents(newEvents)
+                                  }}
+                                  onMoveUp={() => {
+                                    if (index > 0) {
+                                      const newEvents = [...fixedScheduleEvents]
+                                      const [moved] = newEvents.splice(index, 1)
+                                      newEvents.splice(index - 1, 0, moved)
+                                      setFixedScheduleEvents(newEvents)
+                                    }
+                                  }}
+                                  onMoveDown={() => {
+                                    if (index < fixedScheduleEvents.length - 1) {
+                                      const newEvents = [...fixedScheduleEvents]
+                                      const [moved] = newEvents.splice(index, 1)
+                                      newEvents.splice(index + 1, 0, moved)
+                                      setFixedScheduleEvents(newEvents)
+                                    }
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Day Cards */}
             {days.map((day, dayIndex) => (
               <Card
@@ -3046,6 +3511,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                           onDragStart={() => !readOnly && handleDragStart("event", event, dayIndex, eventIndex)}
                           onEdit={() => !readOnly && handleEditEvent(dayIndex, eventIndex)}
                           onDelete={() => !readOnly && handleDeleteEvent(dayIndex, eventIndex)}
+                          onMoveUp={() => !readOnly && handleMoveEvent(dayIndex, eventIndex, 'up')}
+                          onMoveDown={() => !readOnly && handleMoveEvent(dayIndex, eventIndex, 'down')}
                         />
                       ))}
                     </div>
@@ -3056,6 +3523,43 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                         meals={day.meals || []}
                         onChange={(meal, value) => updateDayMeals(dayIndex, meal, value)}
                       />
+                    )}
+
+                    {/* Mobile Quick Add Bar - Horizontal Scrollable Icons */}
+                    {!readOnly && (
+                      <div className="lg:hidden mt-3 pt-2 border-t border-neutral-100">
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-hide px-0.5">
+                          <div className="shrink-0 flex items-center pr-1 border-r border-neutral-100 mr-1">
+                             <div className="w-0.5 h-6 bg-amber-400 rounded-full mr-1.5" />
+                             <span className="text-[8px] font-black text-neutral-400 uppercase tracking-tighter w-6 leading-[1.1]">Quick Add</span>
+                          </div>
+                          {COMPONENT_TEMPLATES.filter(c => !['visa', 'insurance', 'additionalInformation'].includes(c.category)).map((component) => {
+                            const Icon = component.icon
+                            return (
+                              <button
+                                key={component.category}
+                                onClick={() => {
+                                  // Open modal directly for this day and position
+                                  setComponentSourceModal({ 
+                                    isOpen: true, 
+                                    component: component, 
+                                    dropTarget: { dayIndex, position: day.events.length } 
+                                  })
+                                }}
+                                className={cn(
+                                  "flex flex-col items-center gap-0.5 shrink-0 p-1.5 rounded-lg border border-neutral-200 bg-white shadow-sm active:scale-90 transition-all min-w-[48px]",
+                                  component.color.replace('bg-', 'hover:bg-').replace('border-', 'hover:border-')
+                                )}
+                              >
+                                <div className={cn("p-1.5 rounded-md", component.color)}>
+                                  <Icon className="h-3 w-3 text-neutral-700" />
+                                </div>
+                                <span className="text-[8px] font-bold text-neutral-600 uppercase tracking-tighter">{component.title}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                   </CardContent>
                 )}
@@ -3126,45 +3630,32 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </div>
         )}
 
-
-        <div className="mt-2 text-center">
+        <div className="mt-4 text-center">
           <Button onClick={addDay} variant="outline" className="border-dashed border-2 bg-transparent">
             <Plus className="mr-2 h-4 w-4" />
             Add Day
           </Button>
         </div>
 
-        <div className="mt-0 mb-0" onDragOver={(e) => { e.preventDefault(); handleDragOver(-1, 0) }} onDrop={() => handleDrop(-1, 0)}>
-          <h3 className="text-xs font-semibold mb-0.5 text-gray-700">Additional Information</h3>
+        <div className="mt-6 mb-0" onDragOver={(e) => { e.preventDefault(); handleDragOver(-1, 0) }} onDrop={() => handleDrop(-1, 0)}>
+          <h3 className="text-xs font-semibold mb-2 text-gray-700">Additional Information</h3>
 
-          <div className="space-y-0">
+          <div className="space-y-2">
             {serviceSlots.length === 0 && (
-              <div className="text-xs text-gray-400 p-0.5 border border-dashed border-gray-200 rounded bg-gray-50">Drag here</div>
+              <div className="text-xs text-gray-400 p-4 border border-dashed border-gray-200 rounded-xl bg-gray-50 text-center">Drag Additional Information components here</div>
             )}
 
             {serviceSlots.map((slot, slotIndex) => (
-              <Card key={slot.id} className="border border-dashed border-gray-200 rounded-sm">
-                <CardContent className="p-0.5">
-                  <div className="space-y-0">
+              <Card key={slot.id} className="border border-dashed border-gray-200 rounded-xl">
+                <CardContent className="p-2">
+                  <div className="space-y-1">
                     {slot.events.map((event, eventIndex) => (
                       <div key={event.id}>
                         <EventCard
                           event={event}
                           isDetailedView={isDetailedView}
                           onDragStart={() => handleDragStart("event", event)}
-                          onEdit={() => {
-                            // For service slots, we use dayIndex = -1
-                            // and eventIndex to map to the slot index (or flat event list if needed)
-                            // But usually serviceSlots structure is separate.
-                            // Let's assume handleEditEvent can handle dayIndex -1 for serviceSlots.
-                            console.log("[DEBUG] Editing service slot:", slotIndex, eventIndex)
-                            // We need to pass enough info.
-                            // If handleEditEvent only takes (dayIndex, eventIndex), we might need to overload it
-                            // OR render a specific Edit modal for this.
-                            // But let's try to trace handleEditEvent.
-                            // Actually, I'll update this to:
-                            handleEditEvent(-1, slotIndex)
-                          }}
+                          onEdit={() => handleEditEvent(-1, slotIndex)}
                           onDelete={() => {
                             const newSlots = [...serviceSlots]
                             newSlots[slotIndex].events.splice(eventIndex, 1)
@@ -3180,163 +3671,132 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </div>
         </div>
 
-        {/* Pricing Display Section */}
+        {/* Action Buttons */}
+        <div className="mt-10 border-t border-neutral-100 pt-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl">
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg h-12 rounded-xl font-bold transition-all active:scale-95">
+              <Mail className="mr-2 h-4 w-4" />
+              Enquire Now
+            </Button>
+            <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg h-12 rounded-xl font-bold transition-all active:scale-95">
+              <CreditCard className="mr-2 h-4 w-4" />
+              Book Now
+            </Button>
+            <Button variant="outline" className="bg-white hover:bg-neutral-50 text-indigo-600 border-indigo-100 shadow-sm h-12 rounded-xl font-bold transition-all active:scale-95">
+              <Phone className="mr-2 h-4 w-4" />
+              Call
+            </Button>
+            <Button className="bg-[#25D366] hover:bg-[#128C7E] text-white shadow-lg h-12 rounded-xl font-bold transition-all active:scale-95">
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Whatsapp
+            </Button>
+          </div>
+        </div>
+
+        {/* Pricing Summary - Moved to Bottom */}
         {pricingEnabled && (
-          <div className="mt-12 mb-10 p-8 lg:p-12 rounded-3xl border border-neutral-200 bg-white shadow-2xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start gap-12 border-t-[8px] border-t-[#f0c105]/80">
-            {(() => {
-              const pricingConfig: PricingConfig = {
-                adults: pricingAdults,
-                children: pricingChildren,
-                targetCurrency: pricingCurrency,
-                rooms: pricingRooms,
-              }
-              const allEvents = days.flatMap(day => day.events)
-              const { total: basePrice } = calculateTotalPrice(allEvents, pricingConfig)
+          <div className="mt-10 pt-8 border-t border-neutral-100">
+            <Card className="bg-white rounded-xl lg:rounded-2xl shadow-lg border-t-4 border-t-[#f0c105] border border-neutral-200 overflow-hidden max-w-4xl">
+              <div className="p-4 lg:p-6 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-neutral-100">
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Investment Summary</span>
+                  <Badge variant="outline" className="text-[10px] font-bold text-neutral-600 bg-neutral-50">
+                    {pricingCurrency}
+                  </Badge>
+                </div>
 
-              let finalTotal = basePrice
-              if (markupType === "percentage") {
-                finalTotal = basePrice + (basePrice * markupValue / 100)
-              } else {
-                finalTotal = basePrice + markupValue
-              }
+                {(() => {
+                  const pricingConfig: PricingConfig = {
+                    adults: pricingAdults,
+                    children: pricingChildren,
+                    targetCurrency: pricingCurrency,
+                    rooms: pricingRooms,
+                  }
+                  const allEvents = days.flatMap(day => day.events)
+                  const { total: basePrice } = calculateTotalPrice(allEvents, pricingConfig)
 
-              const displayTotal = new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: pricingCurrency,
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              }).format(finalTotal)
+                  let finalTotal = basePrice
+                  if (markupType === "percentage") {
+                    finalTotal = basePrice + (basePrice * markupValue / 100)
+                  } else {
+                    finalTotal = basePrice + markupValue
+                  }
 
-              const displaySubTotal = new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: pricingCurrency,
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              }).format(basePrice)
+                  const displayTotal = new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: pricingCurrency,
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  }).format(finalTotal)
 
-              const strikethroughDisplay = new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: pricingCurrency,
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-              }).format(finalTotal * 1.4)
+                  const displaySubTotal = new Intl.NumberFormat('en-IN', {
+                    style: 'currency',
+                    currency: pricingCurrency,
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  }).format(basePrice)
 
-              const totalPax = pricingAdults + pricingChildren
+                  const totalPax = pricingAdults + pricingChildren
 
-              return (
-                <>
-                  {/* Left Column: Contextual Branding */}
-                  <div className="flex-1 space-y-4">
-                    <div className="inline-flex items-center px-4 py-1.5 rounded-md bg-[#f0c105] text-black text-[10px] font-black uppercase tracking-[0.2em] shadow-sm">
-                      Investment Detail
-                    </div>
-                    <h2 className="text-4xl lg:text-5xl font-serif text-neutral-900 leading-tight">
-                      Pricing Summary
-                    </h2>
-                    <p className="text-neutral-500 text-sm lg:text-base max-w-md font-medium leading-relaxed">
-                      A comprehensive breakdown of your travel investment, tailored to your unique preferences and selected inclusions.
-                    </p>
-                  </div>
-
-                  {/* Right Column: Sleek Professional Financial Card */}
-                  <div className="flex-none w-full md:w-[360px] bg-white p-5 rounded-xl border border-neutral-200 shadow-sm">
-                    <div className="space-y-4">
-                      {/* Header & Currency */}
-                      <div className="flex justify-between items-center pb-2 border-b border-neutral-100">
-                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Investment Summary</span>
-                        <div className="flex justify-end w-[140px]">
-                          <select
-                            value={pricingCurrency}
-                            onChange={(e) => {
-                              const newCurrency = e.target.value
-                              setPricingCurrency(newCurrency)
-                              if (mode === 'quotation') {
-                                setQuotationPricingOptions(prev => ({ ...prev, currency: newCurrency }))
-                              }
-                            }}
-                            className="text-[10px] font-bold text-neutral-600 bg-neutral-50 px-2 py-1 rounded border-none outline-none cursor-pointer hover:bg-neutral-100 transition-colors"
-                          >
-                            <option value="INR">INR</option>
-                            <option value="USD">USD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="GBP">GBP</option>
-                            <option value="AED">AED</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Vertical Price Stack */}
-                      <div className="space-y-3">
-                        {/* Base Amount */}
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-neutral-500">Base Amount</span>
-                          <span className="w-[140px] text-right text-sm font-semibold text-neutral-800">{displaySubTotal}</span>
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-neutral-500">Base Amount</span>
+                          <span className="font-semibold text-neutral-800">{displaySubTotal}</span>
                         </div>
 
-                        {/* Markup Control Section - Perfectly Aligned */}
                         <div className="flex justify-between items-center py-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight flex-shrink-0">Markup</span>
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-tight">Markup</span>
                             <div className="flex bg-neutral-100 rounded border border-neutral-200 p-0.5 scale-90">
                               <button
                                 onClick={() => setMarkupType("percentage")}
                                 className={cn(
-                                  "px-1.5 py-0.5 text-[8px] font-bold rounded transition-colors",
-                                  markupType === "percentage" ? "bg-[#f0c105] text-black shadow-xs" : "text-neutral-400 hover:text-neutral-600"
+                                  "px-1.5 py-0.5 text-[8px] font-bold rounded",
+                                  markupType === "percentage" ? "bg-[#f0c105] text-black" : "text-neutral-400"
                                 )}
-                                style={markupType === "percentage" ? { backgroundColor: 'rgba(240, 193, 5, 0.8)' } : {}}
                               >
                                 %
                               </button>
                               <button
                                 onClick={() => setMarkupType("amount")}
                                 className={cn(
-                                  "px-1.5 py-0.5 text-[8px] font-bold rounded transition-colors",
-                                  markupType === "amount" ? "bg-[#f0c105] text-black shadow-xs" : "text-neutral-400 hover:text-neutral-600"
+                                  "px-1.5 py-0.5 text-[8px] font-bold rounded",
+                                  markupType === "amount" ? "bg-[#f0c105] text-black" : "text-neutral-400"
                                 )}
-                                style={markupType === "amount" ? { backgroundColor: 'rgba(240, 193, 5, 0.8)' } : {}}
                               >
-                                AMT
+                                $
                               </button>
                             </div>
                           </div>
-
-                          <div className="w-[140px] flex items-center justify-end">
-                            <div className="relative flex items-center">
-                              <span className="text-[10px] font-bold text-neutral-400 mr-1">
-                                {markupType === "amount" ? (pricingCurrency === 'INR' ? '₹' : pricingCurrency) : ""}
-                              </span>
-                              <Input
-                                type="number"
-                                value={markupValue || ""}
-                                onChange={(e) => setMarkupValue(Number(e.target.value))}
-                                className="h-8 w-20 text-right text-xs font-bold bg-white border-neutral-200 px-2 rounded-md focus:ring-1 focus:ring-[#f0c105]/30"
-                                placeholder="0"
-                              />
-                              {markupType === "percentage" && (
-                                <span className="text-[10px] font-bold text-neutral-400 ml-1">%</span>
-                              )}
-                            </div>
+                          <div className="flex items-center">
+                            <Input
+                              type="number"
+                              value={markupValue || ""}
+                              onChange={(e) => setMarkupValue(Number(e.target.value))}
+                              className="h-8 w-20 text-right text-xs font-bold bg-neutral-50 border-neutral-200"
+                              placeholder="0"
+                            />
                           </div>
                         </div>
+                      </div>
 
-                        <div className="border-t border-neutral-100 pt-3 mt-1">
-                          <div className="flex justify-between items-center">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Total Investment</span>
-                              {totalPax > 0 && <span className="text-[9px] text-neutral-400 font-medium tracking-tight">for {totalPax} Travelers</span>}
-                            </div>
-                            <span className="w-[140px] text-right text-2xl font-bold text-neutral-900 font-serif leading-none tracking-tight">
-                              {displayTotal}
-                            </span>
-                          </div>
+                      <div className="md:border-l md:border-neutral-100 md:pl-6 py-4 md:py-0">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest leading-none mb-1">Total Amount</span>
+                          <span className="text-3xl font-black text-neutral-900 leading-none tracking-tight">
+                            {displayTotal}
+                          </span>
+                          {totalPax > 0 && <span className="text-[10px] text-neutral-400 font-medium mt-1">Inclusive for {totalPax} Travelers</span>}
                         </div>
+                      </div>
 
-                        {/* Per Person Highlight */}
-                        {totalPax > 1 && (
-                          <div className="flex justify-between items-center pt-1 text-[11px]">
-                            <span className="text-neutral-400 italic">Estimated per person</span>
-                            <span className="w-[140px] text-right font-bold" style={{ color: 'rgba(240, 193, 5, 0.8)' }}>
+                      <div className="md:border-l md:border-neutral-100 md:pl-6">
+                        {totalPax > 1 ? (
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest leading-none mb-1">Per Person</span>
+                            <span className="text-xl font-bold text-amber-600">
                               {new Intl.NumberFormat('en-IN', {
                                 style: 'currency',
                                 currency: pricingCurrency,
@@ -3345,38 +3805,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                               }).format(finalTotal / totalPax)}
                             </span>
                           </div>
+                        ) : (
+                          <div className="text-neutral-400 text-xs italic">
+                            Pricing for 1 traveler
+                          </div>
                         )}
                       </div>
                     </div>
-                  </div>
-                </>
-              )
-            })()}
+                  )
+                })()}
+              </div>
+            </Card>
           </div>
         )}
-
-        {/* Action Buttons Section */}
-        <div className="mt-4 mb-8 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
-            <Mail className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
-            Enquire Now
-          </Button>
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
-            <CreditCard className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
-            Book Now
-          </Button>
-          <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
-            <Phone className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
-            Call
-          </Button>
-          <Button className="w-full bg-[#25D366] hover:bg-[#128C7E] text-white shadow-md h-10 lg:h-11 text-xs lg:text-sm font-bold">
-            <MessageCircle className="mr-1.5 lg:mr-2 h-3.5 w-3.5 lg:h-4 lg:w-4" />
-            Whatsapp
-          </Button>
-        </div>
-
-        {/* Library integration panel removed from builder view */}
+      </div> {/* End of Left Column */}
       </div>
+    </div>
 
       <div className={`hidden lg:flex border-t lg:border-t-0 lg:border-l bg-white flex-col transition-all duration-300 ${isSidebarMinimized ? 'h-auto lg:h-screen lg:w-20' : 'h-auto lg:h-screen w-full lg:w-80'} lg:sticky lg:top-0`}>
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
@@ -3427,30 +3871,6 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               </div>
             </div>
 
-            {/* Quotation Pricing Controls - Only in Quotation Mode */}
-            {mode === 'quotation' && (
-              <div className={`border-t p-4 flex-shrink-0 bg-gray-50/50 ${isSidebarMinimized ? 'hidden lg:block' : ''}`}>
-                <h3 className={`font-bold text-sm lg:text-lg mb-3 ${isSidebarMinimized ? 'hidden' : ''}`}>Pricing & Markup</h3>
-                <div className={isSidebarMinimized ? 'hidden' : ''}>
-                  <QuotationPricingControls
-                    initialOptions={quotationPricingOptions}
-                    onOptionsChange={(newOptions: QuotationPricingOptions) => {
-                      setQuotationPricingOptions(newOptions)
-                      // Sync currency if it changed
-                      if (newOptions.currency && newOptions.currency !== pricingCurrency) {
-                        setPricingCurrency(newOptions.currency)
-                      }
-                    }}
-                    currency={pricingCurrency}
-                  />
-                </div>
-                {isSidebarMinimized && (
-                  <div className="hidden lg:flex justify-center" title="Expand to see pricing controls">
-                    <DollarSign className="h-5 w-5 text-amber-500" />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -3479,6 +3899,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         isOpen={showPreviewConfig}
         onClose={() => setShowPreviewConfig(false)}
         onConfirm={handlePreviewConfirm}
+        initialCompanyId={branding?.id}
       />
       <Dialog open={duplicateDialogOpen} onOpenChange={setDuplicateDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -3498,10 +3919,26 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
         guestDetails={guestDetails}
         agencyDetails={agencyDetails}
         headerFooter={headerFooter}
-        onSave={(newGuestDetails, newAgencyDetails, newHeaderFooter) => {
+        onSave={(newGuestDetails, newAgencyDetails, newHeaderFooter, entityId) => {
           setGuestDetails(newGuestDetails)
           setAgencyDetails(newAgencyDetails)
           setHeaderFooter(newHeaderFooter)
+          
+          // Keep branding in sync with agency details for preview templates
+          setBranding((prev: any) => ({
+            ...prev,
+            id: entityId || prev.id, // Store the selected entity ID
+            logo: newAgencyDetails.logo,
+            companyName: newAgencyDetails.name,
+            address: newAgencyDetails.address,
+            contactPhone: newAgencyDetails.phone,
+            contactEmail: newAgencyDetails.email,
+            gst: newAgencyDetails.gst,
+            headerImage: newHeaderFooter.headerImage,
+            footerImage: newHeaderFooter.footerImage,
+            footerText: newHeaderFooter.contactInfo
+          }))
+
           setHasChanges(true)
         }}
       />
@@ -3609,7 +4046,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div >
+    </div>
   )
 })
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { getAuthHeaders } from '@/lib/client-auth'
 
 interface LibraryItem {
   _id: string
@@ -40,11 +41,26 @@ export function useLibrary() {
   const [libraries, setLibraries] = useState<LibraryCollection[]>([])
   const [loading, setLoading] = useState(false)
   const [librariesLoading, setLibrariesLoading] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  const checkAdminStatus = useCallback(async () => {
+    try {
+      const headers = await getAuthHeaders()
+      const response = await fetch('/api/auth/admin-status', { headers })
+      if (response.ok) {
+        const data = await response.json()
+        setIsAdmin(data.isAdmin)
+      }
+    } catch (error) {
+      console.error('Failed to check admin status:', error)
+    }
+  }, [])
 
   const fetchItems = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch('/api/library')
+      const headers = await getAuthHeaders()
+      const response = await fetch('/api/library', { headers })
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error?.error || 'Failed to fetch items')
@@ -62,7 +78,8 @@ export function useLibrary() {
   const fetchLibraries = useCallback(async () => {
     setLibrariesLoading(true)
     try {
-      const response = await fetch('/api/library-collections')
+      const headers = await getAuthHeaders()
+      const response = await fetch('/api/library-collections', { headers })
       if (!response.ok) {
         const error = await response.json().catch(() => ({}))
         throw new Error(error?.error || 'Failed to fetch library collections')
@@ -78,9 +95,13 @@ export function useLibrary() {
   }, [])
 
   const createLibrary = async (libraryData: { name: string; description?: string }) => {
+    const headers = await getAuthHeaders()
     const response = await fetch('/api/library-collections', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        ...headers,
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(libraryData),
     })
 
@@ -94,9 +115,13 @@ export function useLibrary() {
   }
 
   const updateLibrary = async (id: string, libraryData: { name: string; description?: string }) => {
+    const headers = await getAuthHeaders()
     const response = await fetch(`/api/library-collections/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        ...headers,
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(libraryData),
     })
 
@@ -110,8 +135,10 @@ export function useLibrary() {
   }
 
   const deleteLibrary = async (id: string) => {
+    const headers = await getAuthHeaders()
     const response = await fetch(`/api/library-collections/${id}`, {
       method: 'DELETE',
+      headers
     })
 
     if (!response.ok) {
@@ -124,9 +151,13 @@ export function useLibrary() {
   }
 
   const createItem = async (itemData: any) => {
+    const headers = await getAuthHeaders()
     const response = await fetch('/api/library', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        ...headers,
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(itemData),
     })
 
@@ -140,8 +171,10 @@ export function useLibrary() {
   }
 
   const deleteItem = async (id: string) => {
+    const headers = await getAuthHeaders()
     const response = await fetch(`/api/library/${id}`, {
       method: 'DELETE',
+      headers
     })
 
     if (!response.ok) {
@@ -154,9 +187,13 @@ export function useLibrary() {
   }
 
   const updateItem = async (id: string, itemData: any) => {
+    const headers = await getAuthHeaders()
     const response = await fetch(`/api/library/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        ...headers,
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(itemData),
     })
 
@@ -170,15 +207,17 @@ export function useLibrary() {
   }
 
   useEffect(() => {
+    checkAdminStatus()
     fetchItems()
     fetchLibraries()
-  }, [fetchItems, fetchLibraries])
+  }, [checkAdminStatus, fetchItems, fetchLibraries])
 
   return {
     items,
     libraries,
     loading,
     librariesLoading,
+    isAdmin,
     createItem,
     updateItem,
     deleteItem,

@@ -20,6 +20,8 @@ import { MealForms } from "./meal-forms"
 import { ActivityForms } from "./activity-forms"
 import { NoteForms } from "./note-forms"
 import { ImageForms } from "./image-forms"
+import { FixedScheduleForms } from "./fixed-schedule-forms"
+import { AvailabilityCalendarForms } from "./availability-calendar-forms"
 import { TransferForms } from "./transfer-forms"
 import { AncillariesForms } from "./ancillaries-forms"
 import { OthersForms } from "./others-forms"
@@ -278,6 +280,46 @@ export function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModa
             manualDescription={editedEvent.description || ""}
             setManualDescription={(v) => handleFieldChange("description", v)}
             errors={validationErrors}
+          />
+        )
+
+      case "fixed-schedule":
+      case "fixedSchedule" as any:
+        return (
+          <FixedScheduleForms
+            manualDepartureCity={editedEvent.manualDepartureCity || ""}
+            setManualDepartureCity={(v) => handleFieldChange("manualDepartureCity", v)}
+            manualDate={editedEvent.manualDate || ""}
+            setManualDate={(v) => handleFieldChange("manualDate", v)}
+            manualTitle={editedEvent.title || ""}
+            setManualTitle={(v) => handleFieldChange("title", v)}
+            manualPrice={editedEvent.price || ""}
+            setManualPrice={(v) => handleFieldChange("price", v)}
+            manualOriginalPrice={editedEvent.originalPrice || ""}
+            setManualOriginalPrice={(v) => handleFieldChange("originalPrice", v)}
+            manualOfferedPrice={editedEvent.offeredPrice || ""}
+            setManualOfferedPrice={(v) => handleFieldChange("offeredPrice", v)}
+            manualCurrency={editedEvent.currency || "INR"}
+            setManualCurrency={(v) => handleFieldChange("currency", v)}
+            manualTags={editedEvent.subtitle || ""}
+            setManualTags={(v) => handleFieldChange("subtitle", v)}
+            manualRemarks={editedEvent.description || ""}
+            setManualRemarks={(v) => handleFieldChange("description", v)}
+            errors={validationErrors}
+          />
+        )
+
+      case "availability-calendar":
+        return (
+          <AvailabilityCalendarForms
+            manualTitle={editedEvent.title || ""}
+            setManualTitle={(v) => handleFieldChange("title", v)}
+            manualPrice={editedEvent.price || ""}
+            setManualPrice={(v) => handleFieldChange("price", v)}
+            manualCurrency={editedEvent.currency || "INR"}
+            setManualCurrency={(v) => handleFieldChange("currency", v)}
+            availabilityData={(editedEvent as any).availabilityData || {}}
+            setAvailabilityData={(v) => handleFieldChange("availabilityData" as keyof IItineraryEvent, v)}
           />
         )
 
@@ -572,7 +614,9 @@ export function EditEventModal({ isOpen, onClose, event, onSave }: EditEventModa
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto w-full">
         <DialogHeader>
-          <DialogTitle>Edit {editedEvent.category ? editedEvent.category.charAt(0).toUpperCase() + editedEvent.category.slice(1) : "Event"}</DialogTitle>
+          <DialogTitle>
+            Edit {editedEvent.category === 'fixed-schedule' ? 'Fixed Date' : (editedEvent.category ? editedEvent.category.charAt(0).toUpperCase() + editedEvent.category.slice(1) : "Event")}
+          </DialogTitle>
           <DialogDescription className="sr-only">
             Edit the details of your itinerary event.
           </DialogDescription>

@@ -14,19 +14,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { Upload, Save, Building2, Facebook, Instagram, Twitter, Youtube, Globe, Phone, Loader2 } from "lucide-react"
+import { Upload, Save, Building2, Facebook, Instagram, Twitter, Youtube, Globe, Phone, Loader2, Image as ImageIcon, FileText, Mail, MapPin } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface BrandSettingsDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
+    initialData?: BrandingSettings | null
+    onSave?: (data: BrandingSettings) => void
 }
 
 interface BrandingSettings {
+    id: string
     logo?: string
     companyName?: string
     contactEmail?: string
     contactPhone?: string
     address?: string
+    gst?: string
+    isDefault?: boolean
+    headerImage?: string
+    footerImage?: string
+    headerText?: string
+    footerText?: string
     socialLinks: {
         instagram?: string
         whatsapp?: string
@@ -37,39 +47,29 @@ interface BrandingSettings {
     }
 }
 
-export function BrandSettingsDialog({ open, onOpenChange }: BrandSettingsDialogProps) {
+export function BrandSettingsDialog({ open, onOpenChange, initialData, onSave }: BrandSettingsDialogProps) {
     const { toast } = useToast()
     const [loading, setLoading] = useState(false)
     const [branding, setBranding] = useState<BrandingSettings>({
+        id: "",
         socialLinks: {}
     })
 
     useEffect(() => {
         if (open) {
-            fetchSettings()
-        }
-    }, [open])
-
-    const fetchSettings = async () => {
-        try {
-            setLoading(true)
-            const res = await fetch("/api/settings")
-            if (res.ok) {
-                const data = await res.json()
-                if (data.branding) {
-                    // Merge with defaults to ensure socialLinks structure exists
-                    setBranding({
-                        ...data.branding,
-                        socialLinks: data.branding.socialLinks || {}
-                    })
-                }
+            if (initialData) {
+                setBranding({
+                    ...initialData,
+                    socialLinks: initialData.socialLinks || {}
+                })
+            } else {
+                setBranding({
+                    id: Math.random().toString(36).substring(7),
+                    socialLinks: {}
+                })
             }
-        } catch (error) {
-            console.error("Failed to load branding settings", error)
-        } finally {
-            setLoading(false)
         }
-    }
+    }, [open, initialData])
 
     const handleUpdate = (field: keyof BrandingSettings, value: any) => {
         setBranding(prev => ({ ...prev, [field]: value }))
@@ -86,8 +86,6 @@ export function BrandSettingsDialog({ open, onOpenChange }: BrandSettingsDialogP
     }
 
     const handleLogoUpload = (file: File) => {
-        // In real app, upload to storage/S3 and get URL
-        // For now, using object URL or base64
         const reader = new FileReader();
         reader.onload = (e) => {
             const result = e.target?.result as string;
@@ -96,39 +94,52 @@ export function BrandSettingsDialog({ open, onOpenChange }: BrandSettingsDialogP
         reader.readAsDataURL(file);
     }
 
+    const handleHeaderUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            handleUpdate("headerImage", result);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    const handleFooterUpload = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            handleUpdate("footerImage", result);
+        };
+        reader.readAsDataURL(file);
+    }
+
     const handleSave = async () => {
         try {
             setLoading(true)
-            // We need to preserve other settings (currency), so we might want to fetch first or just PATCH if API supported it.
-            // Current API implementation expects full object or partial? Mongoose update using $set allows partial.
-            // But my POST route implementation does: currency: data.currency, branding: data.branding.
-            // Use $set, so if I only send branding, currency should be untouched?
-            // Wait, let's verify POST implementation.
-            // POST logic: type: "global", $set: { currency: data.currency, branding: data.branding }
-            // If data.currency is undefined, $set might unset it or ignore it??
-            // Mongoose: if property is undefined in object passed to $set, it's NOT ignored, it likely sets it to undefined?
-            // No, JSON.stringify removes undefined keys.
-            // FETCHING current settings first is safer to prevent overwriting currency with null if we only send branding.
+            
+            if (onSave) {
+                await onSave(branding)
+            } else {
+                // Legacy support
+                const currentRes = await fetch("/api/settings")
+                const currentData = await currentRes.json()
 
-            const currentRes = await fetch("/api/settings")
-            const currentData = await currentRes.json()
+                const payload = {
+                    currency: currentData.currency,
+                    branding: branding
+                }
 
-            const payload = {
-                currency: currentData.currency, // Keep existing currency settings
-                branding: branding
+                const res = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                })
+
+                if (!res.ok) throw new Error("Failed to save")
             }
-
-            const res = await fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            })
-
-            if (!res.ok) throw new Error("Failed to save")
 
             toast({
                 title: "Settings saved",
-                description: "Brand settings have been updated successfully.",
+                description: "Entity details have been updated successfully.",
             })
             onOpenChange(false)
         } catch (error) {
@@ -146,9 +157,9 @@ export function BrandSettingsDialog({ open, onOpenChange }: BrandSettingsDialogP
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Brand Settings</DialogTitle>
+                    <DialogTitle>Entity Settings</DialogTitle>
                     <DialogDescription>
-                        Configure your company details and branding used in itineraries.
+                        Configure your entity details and branding used in itineraries.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -157,169 +168,302 @@ export function BrandSettingsDialog({ open, onOpenChange }: BrandSettingsDialogP
                         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                     </div>
                 ) : (
-                    <div className="grid gap-6 py-4">
-                        {/* Company Details */}
-                        <div className="space-y-4">
-                            <h4 className="font-medium flex items-center gap-2 text-sm text-gray-500">
-                                <Building2 className="h-4 w-4" />
-                                Company Details
-                            </h4>
+                    <Tabs defaultValue="identity" className="w-full mt-4">
+                        <TabsList className="grid w-full grid-cols-4 mb-6">
+                            <TabsTrigger value="identity" className="text-xs">Overview</TabsTrigger>
+                            <TabsTrigger value="contact" className="text-xs">Contact</TabsTrigger>
+                            <TabsTrigger value="brand" className="text-xs">Brand Details</TabsTrigger>
+                            <TabsTrigger value="social" className="text-xs">Social</TabsTrigger>
+                        </TabsList>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Logo Upload */}
-                                <div className="md:col-span-2">
-                                    <Label>Company Logo</Label>
-                                    <div className="mt-2 flex items-center gap-4">
-                                        {branding.logo ? (
-                                            <div className="relative group">
-                                                <img
-                                                    src={branding.logo}
-                                                    alt="Company Logo"
-                                                    className="h-16 w-auto object-contain border p-2 rounded-lg bg-gray-50"
-                                                />
+                        <div className="min-h-[400px]">
+                            {/* Overview Section */}
+                            <TabsContent value="identity" className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="grid gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Entity Logo</Label>
+                                            <div className="mt-2 flex items-center gap-4">
+                                                {branding.logo ? (
+                                                    <div className="relative group">
+                                                        <img
+                                                            src={branding.logo}
+                                                            alt="Entity Logo"
+                                                            className="h-20 w-auto object-contain border p-2 rounded-lg bg-gray-50"
+                                                        />
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="icon"
+                                                            className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            onClick={() => handleUpdate("logo", undefined)}
+                                                        >
+                                                            ×
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="h-20 w-32 border-2 border-dashed rounded-lg flex items-center justify-center bg-gray-50 text-gray-400">
+                                                        <Building2 className="h-8 w-8" />
+                                                    </div>
+                                                )}
+
                                                 <Button
-                                                    variant="destructive"
-                                                    size="icon"
-                                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    onClick={() => handleUpdate("logo", undefined)}
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                        const input = document.createElement("input")
+                                                        input.type = "file"
+                                                        input.accept = "image/*"
+                                                        input.onchange = (e) => {
+                                                            const file = (e.target as HTMLInputElement).files?.[0]
+                                                            if (file) handleLogoUpload(file)
+                                                        }
+                                                        input.click()
+                                                    }}
                                                 >
-                                                    ×
+                                                    <Upload className="h-4 w-4 mr-2" />
+                                                    {branding.logo ? "Change Logo" : "Upload Logo"}
                                                 </Button>
                                             </div>
-                                        ) : null}
+                                        </div>
 
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => {
-                                                const input = document.createElement("input")
-                                                input.type = "file"
-                                                input.accept = "image/*"
-                                                input.onchange = (e) => {
-                                                    const file = (e.target as HTMLInputElement).files?.[0]
-                                                    if (file) handleLogoUpload(file)
-                                                }
-                                                input.click()
-                                            }}
-                                        >
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            {branding.logo ? "Change Logo" : "Upload Logo"}
-                                        </Button>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="companyName">Entity Name</Label>
+                                            <Input
+                                                id="companyName"
+                                                value={branding.companyName || ""}
+                                                onChange={(e) => handleUpdate("companyName", e.target.value)}
+                                                placeholder="e.g. Acme Travel"
+                                            />
+                                        </div>
+
+                                        <div className="flex items-center gap-2 pt-2">
+                                            <input
+                                                type="checkbox"
+                                                id="isDefault"
+                                                checked={branding.isDefault || false}
+                                                onChange={(e) => handleUpdate("isDefault", e.target.checked)}
+                                                className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                                            />
+                                            <Label htmlFor="isDefault" className="cursor-pointer font-semibold text-emerald-700">Set as Global Website Default</Label>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 -mt-1 ml-6">When selected, this entity's details (logo, contact, social) will be used throughout the website by default.</p>
                                     </div>
                                 </div>
+                            </TabsContent>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="companyName">Company Name</Label>
-                                    <Input
-                                        id="companyName"
-                                        value={branding.companyName || ""}
-                                        onChange={(e) => handleUpdate("companyName", e.target.value)}
-                                        placeholder="e.g. Acme Travel"
-                                    />
-                                </div>
+                            {/* Contact Section */}
+                            <TabsContent value="contact" className="space-y-6">
+                                <div className="grid grid-cols-1 gap-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="contactEmail">Contact Email</Label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                id="contactEmail"
+                                                value={branding.contactEmail || ""}
+                                                onChange={(e) => handleUpdate("contactEmail", e.target.value)}
+                                                placeholder="contact@example.com"
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="contactEmail">Contact Email</Label>
-                                    <Input
-                                        id="contactEmail"
-                                        value={branding.contactEmail || ""}
-                                        onChange={(e) => handleUpdate("contactEmail", e.target.value)}
-                                        placeholder="contact@example.com"
-                                    />
-                                </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="contactPhone">Contact Phone</Label>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                id="contactPhone"
+                                                value={branding.contactPhone || ""}
+                                                onChange={(e) => handleUpdate("contactPhone", e.target.value)}
+                                                placeholder="+1 234 567 890"
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="contactPhone">Contact Phone</Label>
-                                    <Input
-                                        id="contactPhone"
-                                        value={branding.contactPhone || ""}
-                                        onChange={(e) => handleUpdate("contactPhone", e.target.value)}
-                                        placeholder="+1 234 567 890"
-                                    />
-                                </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="address">Address</Label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                            <Textarea
+                                                id="address"
+                                                value={branding.address || ""}
+                                                onChange={(e) => handleUpdate("address", e.target.value)}
+                                                placeholder="Full office address..."
+                                                rows={4}
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
 
-                                <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor="address">Address</Label>
-                                    <Textarea
-                                        id="address"
-                                        value={branding.address || ""}
-                                        onChange={(e) => handleUpdate("address", e.target.value)}
-                                        placeholder="Full office address..."
-                                        rows={2}
-                                    />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gst">GST Number (Optional)</Label>
+                                        <div className="relative">
+                                            <FileText className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                id="gst"
+                                                value={branding.gst || ""}
+                                                onChange={(e) => handleUpdate("gst", e.target.value)}
+                                                placeholder="Enter GST number"
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            </TabsContent>
+
+                            {/* Brand Details Section */}
+                            <TabsContent value="brand" className="space-y-8">
+                                <div className="grid grid-cols-1 gap-8">
+                                    {/* Header Asset */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                            <ImageIcon className="h-4 w-4" />
+                                            Header Details
+                                        </div>
+                                        <div className="grid gap-4 p-4 border rounded-xl bg-gray-50/50">
+                                            <div className="space-y-2">
+                                                <Label>Header Image (Banner)</Label>
+                                                <div className="flex items-center gap-4">
+                                                    {branding.headerImage && (
+                                                        <img src={branding.headerImage} alt="Header" className="h-12 w-32 object-cover border rounded" />
+                                                    )}
+                                                    <Button variant="outline" size="sm" onClick={() => {
+                                                        const input = document.createElement("input")
+                                                        input.type = "file"
+                                                        input.accept = "image/*"
+                                                        input.onchange = (e) => {
+                                                            const file = (e.target as HTMLInputElement).files?.[0]
+                                                            if (file) handleHeaderUpload(file)
+                                                        }
+                                                        input.click()
+                                                    }}>
+                                                        <Upload className="h-3 w-3 mr-2" />
+                                                        Upload Header
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="headerText">Header Text / Slogan</Label>
+                                                <Input
+                                                    id="headerText"
+                                                    value={branding.headerText || ""}
+                                                    onChange={(e) => handleUpdate("headerText", e.target.value)}
+                                                    placeholder="e.g. Your Journey, Our Passion"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Footer Asset */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                            <FileText className="h-4 w-4" />
+                                            Footer Details
+                                        </div>
+                                        <div className="grid gap-4 p-4 border rounded-xl bg-gray-50/50">
+                                            <div className="space-y-2">
+                                                <Label>Footer Image / Logo</Label>
+                                                <div className="flex items-center gap-4">
+                                                    {branding.footerImage && (
+                                                        <img src={branding.footerImage} alt="Footer" className="h-12 w-32 object-contain border rounded" />
+                                                    )}
+                                                    <Button variant="outline" size="sm" onClick={() => {
+                                                        const input = document.createElement("input")
+                                                        input.type = "file"
+                                                        input.accept = "image/*"
+                                                        input.onchange = (e) => {
+                                                            const file = (e.target as HTMLInputElement).files?.[0]
+                                                            if (file) handleFooterUpload(file)
+                                                        }
+                                                        input.click()
+                                                    }}>
+                                                        <Upload className="h-3 w-3 mr-2" />
+                                                        Upload Footer
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="footerText">Footer Notes / Legal</Label>
+                                                <Textarea
+                                                    id="footerText"
+                                                    value={branding.footerText || ""}
+                                                    onChange={(e) => handleUpdate("footerText", e.target.value)}
+                                                    placeholder="e.g. Terms & Conditions apply"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            {/* Social Section */}
+                            <TabsContent value="social" className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="relative">
+                                        <Instagram className="absolute left-3 top-2.5 h-4 w-4 text-pink-600" />
+                                        <Input
+                                            value={branding.socialLinks?.instagram || ""}
+                                            onChange={(e) => handleSocialUpdate("instagram", e.target.value)}
+                                            placeholder="Instagram URL"
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-green-600" />
+                                        <Input
+                                            value={branding.socialLinks?.whatsapp || ""}
+                                            onChange={(e) => handleSocialUpdate("whatsapp", e.target.value)}
+                                            placeholder="WhatsApp Number"
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <Facebook className="absolute left-3 top-2.5 h-4 w-4 text-blue-600" />
+                                        <Input
+                                            value={branding.socialLinks?.facebook || ""}
+                                            onChange={(e) => handleSocialUpdate("facebook", e.target.value)}
+                                            placeholder="Facebook URL"
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <Twitter className="absolute left-3 top-2.5 h-4 w-4 text-black" />
+                                        <Input
+                                            value={branding.socialLinks?.twitter || ""}
+                                            onChange={(e) => handleSocialUpdate("twitter", e.target.value)}
+                                            placeholder="X (Twitter) URL"
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <Youtube className="absolute left-3 top-2.5 h-4 w-4 text-red-600" />
+                                        <Input
+                                            value={branding.socialLinks?.youtube || ""}
+                                            onChange={(e) => handleSocialUpdate("youtube", e.target.value)}
+                                            placeholder="YouTube URL"
+                                            className="pl-10"
+                                        />
+                                    </div>
+
+                                    <div className="relative">
+                                        <Globe className="absolute left-3 top-2.5 h-4 w-4 text-blue-500" />
+                                        <Input
+                                            value={branding.socialLinks?.website || ""}
+                                            onChange={(e) => handleSocialUpdate("website", e.target.value)}
+                                            placeholder="Website URL"
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                </div>
+                            </TabsContent>
                         </div>
-
-                        {/* Social Links */}
-                        <div className="space-y-4 pt-4 border-t">
-                            <h4 className="font-medium flex items-center gap-2 text-sm text-gray-500">
-                                <Globe className="h-4 w-4" />
-                                Social Media Links
-                            </h4>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="relative">
-                                    <Instagram className="absolute left-3 top-2.5 h-4 w-4 text-pink-600" />
-                                    <Input
-                                        value={branding.socialLinks?.instagram || ""}
-                                        onChange={(e) => handleSocialUpdate("instagram", e.target.value)}
-                                        placeholder="Instagram URL"
-                                        className="pl-10"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <Phone className="absolute left-3 top-2.5 h-4 w-4 text-green-600" />
-                                    <Input
-                                        value={branding.socialLinks?.whatsapp || ""}
-                                        onChange={(e) => handleSocialUpdate("whatsapp", e.target.value)}
-                                        placeholder="WhatsApp Number"
-                                        className="pl-10"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <Facebook className="absolute left-3 top-2.5 h-4 w-4 text-blue-600" />
-                                    <Input
-                                        value={branding.socialLinks?.facebook || ""}
-                                        onChange={(e) => handleSocialUpdate("facebook", e.target.value)}
-                                        placeholder="Facebook URL"
-                                        className="pl-10"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <Twitter className="absolute left-3 top-2.5 h-4 w-4 text-black" />
-                                    <Input
-                                        value={branding.socialLinks?.twitter || ""}
-                                        onChange={(e) => handleSocialUpdate("twitter", e.target.value)}
-                                        placeholder="X (Twitter) URL"
-                                        className="pl-10"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <Youtube className="absolute left-3 top-2.5 h-4 w-4 text-red-600" />
-                                    <Input
-                                        value={branding.socialLinks?.youtube || ""}
-                                        onChange={(e) => handleSocialUpdate("youtube", e.target.value)}
-                                        placeholder="YouTube URL"
-                                        className="pl-10"
-                                    />
-                                </div>
-
-                                <div className="relative">
-                                    <Globe className="absolute left-3 top-2.5 h-4 w-4 text-blue-500" />
-                                    <Input
-                                        value={branding.socialLinks?.website || ""}
-                                        onChange={(e) => handleSocialUpdate("website", e.target.value)}
-                                        placeholder="Website URL"
-                                        className="pl-10"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    </Tabs>
                 )}
 
                 <DialogFooter>

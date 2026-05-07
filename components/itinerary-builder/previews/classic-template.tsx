@@ -99,10 +99,21 @@ export function ClassicTemplate({
         return d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' })
     }
 
+    const headerImage = itinerary.headerFooter?.headerImage || itinerary.branding?.headerImage
+    const footerImage = itinerary.headerFooter?.footerImage || itinerary.branding?.footerImage
+
     return (
         <div className="w-full bg-slate-50 text-slate-800 font-sans selection:bg-blue-100 min-h-screen">
             {/* ------------------- HEADER ------------------- */}
-            <header className="bg-white border-b border-slate-200 px-8 py-8 md:py-12 mb-8 shadow-sm">
+            <header 
+                className="border-b border-slate-200 px-8 py-8 md:py-12 mb-8 shadow-sm relative overflow-hidden"
+                style={{
+                    backgroundImage: headerImage ? `linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), url(${headerImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundColor: 'white'
+                }}
+            >
                 <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-start gap-8">
                     <div className="text-left space-y-4 max-w-lg">
                         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
@@ -276,7 +287,16 @@ export function ClassicTemplate({
             </main>
 
             {/* ------------------- FOOTER ------------------- */}
-            <footer className="bg-white border-t border-slate-200 pt-12 pb-8 px-8">
+            <footer 
+                className="border-t border-slate-200 pt-12 pb-8 px-8"
+                style={{
+                    backgroundImage: footerImage ? `linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), url(${footerImage})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    backgroundColor: 'white',
+                    textShadow: footerImage ? "0 1px 2px rgba(255,255,255,0.8)" : "none"
+                }}
+            >
                 <div className="max-w-4xl mx-auto">
                     <div className="flex flex-col md:flex-row justify-between gap-8 mb-8">
                         <div className="space-y-4 max-w-xs">
@@ -352,3 +372,4 @@ export function ClassicTemplate({
         </div>
     )
 }
+

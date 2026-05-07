@@ -23,6 +23,8 @@ import { MealForms } from "./meal-forms"
 import { ActivityForms } from "./activity-forms"
 import { NoteForms } from "./note-forms"
 import { ImageForms } from "./image-forms"
+import { FixedScheduleForms } from "./fixed-schedule-forms"
+import { AvailabilityCalendarForms } from "./availability-calendar-forms"
 import { transferSubCategories, ancillariesSubCategories, othersSubCategories } from "./constants"
 
 interface ComponentSourceModalProps {
@@ -45,6 +47,7 @@ export function ComponentSourceModal({
   onSelectLibrary,
 }: ComponentSourceModalProps) {
   const { items } = useLibrary()
+  const [activeTab, setActiveTab] = useState<'my-libraries' | 'global-libraries'>('my-libraries')
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSource, setSelectedSource] = useState<"manual" | "library" | null>(null)
   const [sortBy, setSortBy] = useState<"name" | "price" | "rating" | "recent">("name")
@@ -60,6 +63,7 @@ export function ComponentSourceModal({
       setSelectedSource(null)
       setSearchQuery("")
       setSelectedSubCategory("") // Reset subcategory when modal closes
+      setActiveTab("my-libraries") // Reset tab when modal closes
     }
   }, [isOpen])
 
@@ -75,12 +79,13 @@ export function ComponentSourceModal({
     }
   }, [])
 
-  // Filter library items by component type. For the Additional Information
-  // component we accept multiple category name forms (e.g. "additionalInformation",
-  // "additional-info", "additional info") and also include items that have
-  // `extraFields.additionalInfo` populated so they appear automatically.
+  // Filter library items by component type and Global/Personal status.
   const filteredLibraryItems = items
     .filter((item) => {
+      // 1. Filter by Tab (Personal vs Global)
+      const isGlobalTab = activeTab === 'global-libraries'
+      if (isGlobalTab !== !!item.isGlobal) return false
+
       const itemCategory = (item.category || "").toString().toLowerCase()
       const compType = (componentType || "").toString().toLowerCase()
 
@@ -478,6 +483,12 @@ export function ComponentSourceModal({
     }
   }, [manualNumberOfStops])
 
+  // Fixed Schedule Fields
+  const [manualDepartureCity, setManualDepartureCity] = useState("")
+  const [manualFixedDate, setManualFixedDate] = useState("")
+
+  const [availabilityData, setAvailabilityData] = useState<Record<string, any>>({})
+
   const handleSubmitManual = () => {
     const cleanedBullets = manualBullets.map((b) => (b || "").toString()).map((s) => s.trim()).filter(Boolean)
     const cleanedAmenities = manualAmenities.map((a) => (a || "").toString()).map((s) => s.trim()).filter(Boolean)
@@ -676,6 +687,15 @@ export function ComponentSourceModal({
     if (manualHotelLink) payload.hotelLink = manualHotelLink
     if (manualConfirmationNumber) payload.confirmationNumber = manualConfirmationNumber
 
+    // Fixed Schedule fields
+    if (manualDepartureCity) payload.manualDepartureCity = manualDepartureCity
+    if (manualFixedDate) payload.manualDate = manualFixedDate
+
+    // Availability Calendar specific payload
+    if (componentType.toLowerCase() === "availability-calendar") {
+      payload.availabilityData = availabilityData
+    }
+
     // Add subcategory for Transfer and Ancillaries
     if (selectedSubCategory) payload.subCategory = selectedSubCategory
 
@@ -764,7 +784,11 @@ export function ComponentSourceModal({
     setManualAddress("")
     setManualHotelLink("")
     setManualConfirmationNumber("")
-    setManualNoteContent("") // Reset note content
+    setManualDepartureCity("")
+    setManualFixedDate("")
+    setManualNoteContent("")
+    setAvailabilityData({})
+ // Reset note content
     // Reset others fields
     setManualGiftAmount("")
     setManualServiceCharge("")
@@ -1437,8 +1461,28 @@ export function ComponentSourceModal({
                 />
               ) : componentType.toLowerCase() === "note" ? (
                 <NoteForms
-                  manualDescription={manualDescription}
-                  setManualDescription={setManualDescription}
+                  manualDescription={manualNoteContent}
+                  setManualDescription={setManualNoteContent}
+                />
+              ) : componentType.toLowerCase() === "fixed-schedule" || componentType.toLowerCase() === "fixedschedule" ? (
+                <FixedScheduleForms
+                  manualDepartureCity={manualDepartureCity}
+                  setManualDepartureCity={setManualDepartureCity}
+                  manualDate={manualFixedDate}
+                  setManualDate={setManualFixedDate}
+                  manualTitle={manualTitle}
+                  setManualTitle={setManualTitle}
+                />
+              ) : componentType.toLowerCase() === "availability-calendar" ? (
+                <AvailabilityCalendarForms
+                  manualTitle={manualTitle}
+                  setManualTitle={setManualTitle}
+                  manualPrice={manualPrice}
+                  setManualPrice={setManualPrice}
+                  manualCurrency={manualCurrency}
+                  setManualCurrency={setManualCurrency}
+                  availabilityData={availabilityData}
+                  setAvailabilityData={setAvailabilityData}
                 />
               ) : componentType.toLowerCase() === "image" ? (
                 <ImageForms
@@ -1798,19 +1842,19 @@ export function ComponentSourceModal({
                 </Button>
               </div>
 
-              <Tabs defaultValue="my-libraries" className="w-full">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-4">
                   <TabsTrigger value="my-libraries" className="text-sm">
                     <Library className="h-4 w-4 mr-2" />
                     My Libraries
                   </TabsTrigger>
                   <TabsTrigger value="global-libraries" className="text-sm">
-                    <Library className="h-4 w-4 mr-2" />
-                    Global Libraries
+                    <Star className="h-4 w-4 mr-2" />
+                    Global Library
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="my-libraries" className="mt-0 flex flex-col overflow-hidden h-[400px]">
+                <div className="mt-0 flex flex-col overflow-hidden h-[400px]">
                   {/* Search and Filters */}
                   <div className="flex gap-4 mb-4 flex-shrink-0">
                     <div className="relative flex-1">
@@ -1833,24 +1877,15 @@ export function ComponentSourceModal({
                         <SelectItem value="recent">Recent</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={filterBy} onValueChange={(value) => setFilterBy(value as "all" | "popular" | "recent" | "favorites")}>
-                      <SelectTrigger className="w-32">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Items</SelectItem>
-                        <SelectItem value="favorites">Favorites</SelectItem>
-                        <SelectItem value="recent">Recent</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="flex-1 overflow-y-auto min-h-0 border border-gray-200 rounded library-scrollbar pr-2">
                     {filteredLibraryItems.length === 0 ? (
                       <div className="text-center py-12">
                         <Library className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-500 mb-2">No {componentTitle.toLowerCase()} items found in library</p>
+                        <p className="text-gray-500 mb-2">
+                          No {componentTitle.toLowerCase()} items found in {activeTab === 'my-libraries' ? 'personal' : 'global'} library
+                        </p>
                         <p className="text-sm text-gray-400">Try creating one manually instead</p>
                         <Button variant="outline" className="mt-4 bg-transparent" onClick={handleSelectManual}>
                           Create Manually
@@ -1902,6 +1937,12 @@ export function ComponentSourceModal({
                                             Recent
                                           </Badge>
                                         )}
+                                        {item.isGlobal && (
+                                          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                            <Star className="h-3 w-3 mr-1" />
+                                            Global
+                                          </Badge>
+                                        )}
                                         {item.city && (
                                           <Badge variant="outline" className="text-xs">
                                             {item.city}
@@ -1934,19 +1975,7 @@ export function ComponentSourceModal({
                       </div>
                     )}
                   </div>
-                </TabsContent>
-
-                <TabsContent value="global-libraries" className="mt-0">
-                  <div className="flex items-center justify-center py-16">
-                    <div className="text-center">
-                      <Library className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-                      <h3 className="text-lg font-medium text-gray-500 mb-2">Global Libraries</h3>
-                      <p className="text-sm text-gray-400">
-                        Coming soon! Access to global library items from all agencies.
-                      </p>
-                    </div>
-                  </div>
-                </TabsContent>
+                </div>
               </Tabs>
             </div>
           </div>

@@ -11,12 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Sidebar } from "@/components/sidebar"
 import { TopHeader } from "@/components/top-header"
-import { QuotationPricingControls } from "@/components/quotation-pricing-controls"
 import { QuotationClientEditor, ClientInfo } from "@/components/quotation-client-editor"
 import { QuotationSettings, QuotationSettingsData } from "@/components/quotation-settings"
 import { useQuotations, QuotationData } from "@/hooks/use-quotations"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Save, Send, Printer, Download, Eye, EyeOff, Calculator, Percent, DollarSign, Lock, Pencil, History } from "lucide-react"
+import { ArrowLeft, Save, Send, Printer, Download, Eye, EyeOff, Calculator, Percent, DollarSign, Lock, Pencil, History, CheckCircle2 } from "lucide-react"
 import { recalculateQuotationTotals } from "@/lib/pricing-utils"
 import { convertCurrency, convertQuotationPrices, formatCurrencyWithSymbol } from "@/lib/currency-utils"
 import { CurrencyConversion } from "@/components/currency-conversion"
@@ -37,6 +36,7 @@ import { ItineraryBuilder } from "@/components/itinerary-builder"
 import { QuotationStatusStepper } from "@/components/quotation-status-stepper"
 import { UserWallet } from "@/components/user-wallet"
 import { Badge } from "@/components/ui/badge"
+import { getAuthHeaders } from "@/lib/client-auth"
 
 // Define interfaces for type safety
 interface DayEvent {
@@ -152,21 +152,20 @@ export function QuotationDetail({ id }: { id: string }) {
         const updatedData = recalculateTotals(data);
         setQuotation(updatedData)
         setShowPrices(updatedData.pricingOptions.showIndividualPrices)
-        setSelectedVersion(updatedData.currentVersion || 1)
+        
+        // Priority: Use currentVersion if available, otherwise latest from history
+        const currentV = updatedData.currentVersion || 1
+        setSelectedVersion(currentV)
+        
+        // If we are on the current version, we use the top-level data (which is the draft state)
+        // No need to set displayData, ItineraryBuilder will use initialDays etc. from quotation object
         setIsReadOnly(false)
+        setDisplayData(null)
 
         // Set initial display currency to the quotation's base currency
         setDisplayCurrency(updatedData.currency || "USD")
 
-        // Check if the latest version is locked
-        if (updatedData.versionHistory && updatedData.versionHistory.length > 0) {
-          const latestVersion = updatedData.versionHistory[updatedData.versionHistory.length - 1]
-          setVersionLocked(latestVersion.isLocked || false)
-        } else {
-          setVersionLocked(false)
-        }
-
-        // Also check the global lock status
+        // Check lock status - prioritize global isLocked
         setVersionLocked(updatedData.isLocked || false)
       }
     }
@@ -211,6 +210,10 @@ export function QuotationDetail({ id }: { id: string }) {
   const currentHtmlContent = displayData?.htmlContent || quotation?.htmlContent
   const currentHtmlBlocks = displayData?.htmlBlocks || quotation?.htmlBlocks
   const currentProductId = displayData?.productId || quotation?.productId
+  const currentFixedScheduleEvents = displayData?.fixedScheduleEvents || quotation?.fixedScheduleEvents
+  const currentGuestDetails = displayData?.guestDetails || quotation?.guestDetails
+  const currentAgencyDetails = displayData?.agencyDetails || quotation?.agencyDetails
+  const currentHeaderFooter = displayData?.headerFooter || quotation?.headerFooter
 
   const handleEditItinerary = () => {
     if (!quotation) return
@@ -427,10 +430,12 @@ export function QuotationDetail({ id }: { id: string }) {
     if (!quotation) return
 
     try {
+      const headers = await getAuthHeaders();
       // Create a new version with the current state - convert notes to description
       const response = await fetch(`/api/quotations/${quotation._id}/versions`, {
         method: 'POST',
         headers: {
+          ...headers,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ description: versionData.notes }),
@@ -474,10 +479,12 @@ export function QuotationDetail({ id }: { id: string }) {
     }
 
     try {
+      const headers = await getAuthHeaders();
       // Lock the specified version
       const response = await fetch(`/api/quotations/${quotation._id}/lock`, {
         method: 'POST',
         headers: {
+          ...headers,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -487,21 +494,90 @@ export function QuotationDetail({ id }: { id: string }) {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to lock version')
+        const errorData = await response.json()
+        throw new Error(errorData.message || errorData.error || 'Failed to lock version')
       }
 
       const updatedQuotation = await response.json()
       syncQuotationState(updatedQuotation)
-      setVersionLocked(true)
+      setVersionLocked(false) // New version created is NOT locked
+      
+      // Update selected version to the new draft
+      setSelectedVersion(updatedQuotation.currentVersion)
+      setIsReadOnly(false)
+      setDisplayData(null)
+
+      // Trigger credit deduction animation
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 3 } }));
+      }
+
       toast({
-        title: "Success",
-        description: "Version locked successfully",
+        title: "Quote Finalised",
+        description: `Version ${parsedVersion} locked. Version ${updatedQuotation.currentVersion} created as draft. 3 credits deducted.`,
       })
-    } catch (error) {
+
+    } catch (error: any) {
       console.error("Error locking version:", error)
       toast({
+        title: "Finalization Failed",
+        description: error.message || "Failed to lock version",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Handle extracting data from an old version to current draft
+  const handleExtractVersion = async () => {
+    if (!displayData || !quotation) return
+
+    try {
+      // Show confirmation dialog
+      const confirmed = window.confirm(`Are you sure you want to extract Version ${selectedVersion}? This will overwrite your current draft state with the data from this version.`)
+      if (!confirmed) return
+
+      // Use updateQuotation to save the displayData into the current quotation
+      const payload = {
+        days: displayData.days,
+        pricingOptions: displayData.pricingOptions,
+        subtotal: displayData.subtotal,
+        total: displayData.total,
+        title: displayData.title,
+        description: displayData.description,
+        countries: displayData.countries,
+        productReferenceCode: displayData.productReferenceCode,
+        branding: displayData.branding,
+        gallery: displayData.gallery,
+        overviewEvents: displayData.overviewEvents,
+        serviceSlots: displayData.serviceSlots,
+        notes: displayData.notes,
+        highlights: displayData.highlights,
+        images: displayData.images,
+        type: displayData.type,
+        cartItems: displayData.cartItems,
+        htmlContent: displayData.htmlContent,
+        htmlBlocks: displayData.htmlBlocks,
+        productId: displayData.productId,
+      }
+
+      const updatedQuotation = await updateQuotation(quotation._id!, payload)
+
+      if (updatedQuotation) {
+        syncQuotationState(updatedQuotation)
+        setSelectedVersion(updatedQuotation.currentVersion)
+        setIsReadOnly(false)
+        setDisplayData(null)
+        
+        toast({
+          title: "Version Extracted",
+          description: `Data from V${selectedVersion} has been extracted to your current draft.`,
+        })
+      }
+    } catch (error) {
+      console.error("Error extracting version:", error)
+      toast({
         title: "Error",
-        description: "Failed to lock version",
+        description: "Failed to extract version data",
         variant: "destructive",
       })
     }
@@ -564,114 +640,152 @@ export function QuotationDetail({ id }: { id: string }) {
                     Back
                   </Button>
                   <div className="h-6 w-px bg-neutral-200" />
-                  <div className="flex flex-col">
-                    <h1 className="text-xl font-bold flex items-center gap-2">
+                <div className="flex items-center gap-6 flex-1">
+                    <h1 className="text-xl font-bold truncate max-w-[200px] lg:max-w-[400px]" title={quotation.title}>
                       {quotation.title}
                     </h1>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs font-medium text-neutral-500">Version:</span>
-                      <Select value={selectedVersion?.toString()} onValueChange={handleVersionChange}>
-                        <SelectTrigger className="h-7 w-[100px] text-xs">
-                          <SelectValue placeholder="Select version" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {quotation.versionHistory?.map((v) => (
-                            <SelectItem key={v.versionNumber} value={v.versionNumber.toString()}>
-                              V{v.versionNumber} {v.versionNumber === quotation.currentVersion ? '(Current)' : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {isReadOnly && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Read Only</Badge>}
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-neutral-500 whitespace-nowrap">Version:</span>
+                        <Select value={selectedVersion?.toString()} onValueChange={handleVersionChange}>
+                          <SelectTrigger className="h-7 w-[100px] text-xs">
+                            <SelectValue placeholder="Select version" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {quotation.versionHistory?.map((v) => (
+                              <SelectItem key={v.versionNumber} value={v.versionNumber.toString()}>
+                                V{v.versionNumber} {v.versionNumber === quotation.currentVersion ? '(Current)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {isReadOnly && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Read Only</Badge>}
+                      </div>
+                        {isReadOnly ? (
+                          <div className="flex items-center gap-2 ml-auto">
+                            <Button
+                              onClick={handleExtractVersion}
+                              variant="outline"
+                              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm transition-all duration-300 px-6 h-9 font-bold"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Extract to Draft
+                            </Button>
+                            <Button
+                              onClick={() => {
+                                // Logic for sharing
+                                toast({
+                                  title: "Share Quotation",
+                                  description: "Sharing functionality triggered for locked version.",
+                                });
+                                // If there is a specific share link or modal, trigger it here
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all duration-300 px-6 h-9 font-bold"
+                            >
+                              <Send className="mr-2 h-4 w-4" />
+                              Share Quote
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button 
+                            onClick={() => {
+                              if (selectedVersion) {
+                                handleLockVersion(selectedVersion.toString());
+                              }
+                            }}
+                            className="bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all duration-300 px-6 h-9 font-bold ml-auto"
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Finalise Quote
+                          </Button>
+                        )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="h-8 w-px bg-neutral-200" />
-                  <QuotationStatusStepper
-                    currentStatus={quotation.status}
-                    onStatusChange={handleStatusChange}
-                    disabled={isReadOnly || (versionLocked && quotation.status !== 'draft')}
-                  />
-                </div>
               </div>
-              <ItineraryBuilder
-                itineraryId={quotation.itineraryId}
-                quotationId={quotation._id}
-                mode="quotation"
-                readOnly={isReadOnly}
-                initialDays={currentDays}
-                initialPricingOptions={currentPricing}
-                initialTitle={currentTitle}
-                initialDescription={currentDescription}
-                initialCountries={currentCountries}
-                initialProductReferenceCode={currentProductReferenceCode}
-                initialBranding={currentBranding}
-                initialGallery={currentGallery}
-                initialOverviewEvents={currentOverviewEvents}
-                initialServiceSlots={currentServiceSlots}
-                initialNotes={currentNotes}
-                initialHighlights={currentHighlights}
-                initialImages={currentImages}
-                initialType={currentType}
-                initialCartItems={currentCartItems}
-                initialHtmlContent={currentHtmlContent}
-                initialHtmlBlocks={currentHtmlBlocks}
-                hideWallet={true}
-                onBack={() => router.push('/dashboard')}
-                onSave={async (data?: any) => {
-                  console.log('[QUOTATION SAVE] onSave triggered with data:', data);
+              <div className="flex-1 overflow-hidden">
+                <ItineraryBuilder
+                  itineraryId={quotation.itineraryId}
+                  quotationId={quotation._id}
+                  mode="quotation"
+                  readOnly={isReadOnly}
+                  initialDays={currentDays}
+                  initialPricingOptions={currentPricing}
+                  initialTitle={currentTitle}
+                  initialDescription={currentDescription}
+                  initialCountries={currentCountries}
+                  initialProductReferenceCode={currentProductReferenceCode}
+                  initialBranding={currentBranding}
+                  initialGallery={currentGallery}
+                  initialOverviewEvents={currentOverviewEvents}
+                  initialServiceSlots={currentServiceSlots}
+                  initialNotes={currentNotes}
+                  initialHighlights={currentHighlights}
+                  initialImages={currentImages}
+                  initialType={currentType}
+                  initialCartItems={currentCartItems}
+                  initialHtmlContent={currentHtmlContent}
+                  initialHtmlBlocks={currentHtmlBlocks}
+                  initialFixedScheduleEvents={currentFixedScheduleEvents}
+                  initialGuestDetails={currentGuestDetails}
+                  initialAgencyDetails={currentAgencyDetails}
+                  initialHeaderFooter={currentHeaderFooter}
+                  hideWallet={true}
+                  onBack={() => router.push('/quotation-builder')}
+                  onSave={async (data?: any) => {
+                    console.log('[QUOTATION SAVE] onSave triggered with data:', data);
 
-                  if (data && data.quotationOptions && data.days) {
-                    try {
-                      // Construct a temporary quotation to recalculate totals
-                      const tempQuotation = {
-                        ...quotation,
-                        ...data,
-                        pricingOptions: data.quotationOptions
-                      };
+                    if (data && data.quotationOptions && data.days) {
+                      try {
+                        // Construct a temporary quotation to recalculate totals
+                        const tempQuotation = {
+                          ...quotation,
+                          ...data,
+                          pricingOptions: data.quotationOptions
+                        };
 
-                      const recalculated = recalculateTotals(tempQuotation);
+                        const recalculated = recalculateTotals(tempQuotation);
 
-                      // Construct the payload with ALL fields from data
-                      const payload = {
-                        ...data,
-                        pricingOptions: recalculated.pricingOptions,
-                        subtotal: recalculated.subtotal,
-                        markup: recalculated.markup,
-                        total: recalculated.total,
-                        client: quotation.client,
-                        currencySettings: quotation.currencySettings,
-                        notes: data.notes || quotation.notes,
-                        title: data.title || quotation.title,
-                        description: data.description || quotation.description,
-                        validUntil: quotation.validUntil,
-                        totalPrice: recalculated.price || recalculated.total
-                      };
+                        // Construct the payload with ALL fields from data
+                        const payload = {
+                          ...data,
+                          pricingOptions: recalculated.pricingOptions,
+                          subtotal: recalculated.subtotal,
+                          markup: recalculated.markup,
+                          total: recalculated.total,
+                          client: quotation.client,
+                          currencySettings: quotation.currencySettings,
+                          notes: data.notes || quotation.notes,
+                          title: data.title || quotation.title,
+                          description: data.description || quotation.description,
+                          validUntil: quotation.validUntil,
+                          totalPrice: recalculated.price || recalculated.total
+                        };
 
-                      const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
-                      syncQuotationState(updatedQuotation);
+                        const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                        syncQuotationState(updatedQuotation);
 
-                      toast({
-                        title: "Success",
-                        description: "New version created successfully"
-                      });
-                    } catch (error) {
-                      console.error('[QUOTATION SAVE] Error during save:', error);
-                      toast({
-                        title: "Error",
-                        description: error instanceof Error ? error.message : "Failed to save quotation",
-                        variant: "destructive"
-                      });
+                        toast({
+                          title: "Success",
+                          description: "New version created successfully"
+                        });
+                      } catch (error) {
+                        console.error('[QUOTATION SAVE] Error during save:', error);
+                        toast({
+                          title: "Error",
+                          description: error instanceof Error ? error.message : "Failed to save quotation",
+                          variant: "destructive"
+                        });
+                      }
                     }
+                  }}
+                  extraActions={
+                    <Button variant="outline" size="icon" onClick={() => setIsVersionHistoryOpen(true)} title="Version History">
+                      <History className="h-4 w-4" />
+                    </Button>
                   }
-                }}
-                extraActions={
-                  <Button variant="outline" size="icon" onClick={() => setIsVersionHistoryOpen(true)} title="Version History">
-                    <History className="h-4 w-4" />
-                  </Button>
-                }
-              />
+                />
+              </div>
               <Dialog open={isVersionHistoryOpen} onOpenChange={setIsVersionHistoryOpen}>
                 <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
                   {quotation && (
@@ -697,8 +811,10 @@ export function QuotationDetail({ id }: { id: string }) {
                           setIsVersionHistoryOpen(false);
 
                           // Call API to restore the version
+                          const headers = await getAuthHeaders();
                           const response = await fetch(`/api/quotations/${id}/versions/${versionNumber}`, {
-                            method: 'PUT'
+                            method: 'PUT',
+                            headers
                           });
 
                           if (!response.ok) {

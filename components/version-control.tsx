@@ -210,14 +210,14 @@ export function VersionControl({
               <div>
                 <h4 className="font-medium mb-2">Recent Versions</h4>
                 <div className="rounded-md border overflow-hidden">
-                  <Table>
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Version</TableHead>
-                        <TableHead>Created</TableHead>
+                        <TableHead className="w-[100px]">Version</TableHead>
+                        <TableHead className="w-[180px]">Created</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="w-[120px]">Status</TableHead>
+                        <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -313,16 +313,16 @@ export function VersionControl({
           <div className="py-4">
             {versionHistory.length > 0 ? (
               <div className="rounded-md border overflow-hidden">
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Version</TableHead>
-                      <TableHead>Created</TableHead>
+                      <TableHead className="w-[80px]">Version</TableHead>
+                      <TableHead className="w-[160px]">Created</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Locked By</TableHead>
-                      <TableHead>Locked At</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                      <TableHead className="w-[120px]">Locked By</TableHead>
+                      <TableHead className="w-[160px]">Locked At</TableHead>
+                      <TableHead className="w-[90px] text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

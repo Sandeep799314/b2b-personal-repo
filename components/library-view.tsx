@@ -25,6 +25,7 @@ interface ILibraryItem {
   multimedia?: string[]
   libraryId?: string | null
   libraryName?: string
+  isGlobal?: boolean
 }
 
 export function LibraryView() {
@@ -53,7 +54,7 @@ export function LibraryView() {
   const [selectedManageLibraryId, setSelectedManageLibraryId] = useState<string | null>(null)
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null)
 
-  const { items: dbItems, libraries, loading, librariesLoading, deleteItem, createLibrary, updateLibrary, deleteLibrary, fetchLibraries } = useLibrary()
+  const { items: dbItems, libraries, loading, librariesLoading, deleteItem, createLibrary, updateLibrary, deleteLibrary, fetchLibraries, isAdmin } = useLibrary()
 
   // Transform DB items to component format
   const items: ILibraryItem[] = dbItems.map(item => {
@@ -70,6 +71,7 @@ export function LibraryView() {
       multimedia: item.multimedia || [],
       libraryId: item.libraryCollection?._id ?? null,
       libraryName: item.libraryCollection?.name || undefined,
+      isGlobal: item.isGlobal || false,
     }
   })
 
@@ -164,13 +166,20 @@ export function LibraryView() {
 
   const filteredItems = items
     .filter(item => {
-      const matchesLibrary = activeLibraryGroupId
-        ? activeLibraryGroupId === 'ungrouped'
-          ? !item.libraryId
-          : activeLibraryGroupId === 'all'
-            ? true
-            : item.libraryId === activeLibraryGroupId
-        : true
+      // Filter by tab: Personal vs Global
+      const matchesTab = activeLibraryTab === 'personal' ? !item.isGlobal : item.isGlobal
+
+      // If on Global tab, show everything regardless of library (unless it's the admin who might want to filter)
+      const matchesLibrary = (activeLibraryTab === 'public' && !isAdmin)
+        ? true
+        : activeLibraryGroupId
+          ? activeLibraryGroupId === 'ungrouped'
+            ? !item.libraryId
+            : activeLibraryGroupId === 'all'
+              ? true
+              : item.libraryId === activeLibraryGroupId
+          : true
+
       const normalizedCategory = item.type.toLowerCase()
       const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesCategory = (
@@ -178,7 +187,7 @@ export function LibraryView() {
         normalizedCategory === selectedCategory ||
         (selectedCategory === 'others' && !['flight', 'hotel', 'activity', 'transfer', 'meal', 'ancillaries', 'package'].includes(normalizedCategory))
       )
-      return matchesLibrary && matchesSearch && matchesCategory
+      return matchesTab && matchesLibrary && matchesSearch && matchesCategory
     })
     .sort((a, b) => {
       const dateA = new Date(a.date).getTime()
@@ -370,44 +379,56 @@ export function LibraryView() {
 
         {/* Library Content */}
         <div className="flex-1 p-6 overflow-auto">
-          {activeLibraryTab === 'personal' ? (
-            <div>
-              {/* Personal Library Header */}
-              <div className="mb-6">
-                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                  <div>
-                    <h2 className="text-xl font-semibold text-gray-900">My Library</h2>
-                    <p className="text-sm text-gray-600">Manage your personal travel library items</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => router.push('/itinerary?from=library')}
-                      className="border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                    >
-                      <Package className="h-4 w-4" />
-                      <span>Itineraries</span>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setNewLibraryName('')
-                        setNewLibraryDescription('')
-                        setShowCreateLibraryModal(true)
-                      }}
-                      className="border-gray-300 text-gray-700 hover:bg-gray-100"
-                    >
-                      New Playlist
-                    </Button>
+          <div>
+            {/* Library Header */}
+            <div className="mb-6">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {activeLibraryTab === 'personal' ? 'My Library' : 'Global Library'}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {activeLibraryTab === 'personal'
+                      ? 'Manage your personal travel library items'
+                      : 'Common travel products available to everyone'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {activeLibraryTab === 'personal' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push('/itinerary?from=library')}
+                        className="border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+                      >
+                        <Package className="h-4 w-4" />
+                        <span>Itineraries</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setNewLibraryName('')
+                          setNewLibraryDescription('')
+                          setShowCreateLibraryModal(true)
+                        }}
+                        className="border-gray-300 text-gray-700 hover:bg-gray-100"
+                      >
+                        New Playlist
+                      </Button>
+                    </>
+                  )}
+                  {(activeLibraryTab === 'personal' || isAdmin) && (
                     <Button
                       onClick={handleOpenCreateItem}
                       className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg font-medium"
                     >
                       + Add Item
                     </Button>
-                  </div>
+                  )}
                 </div>
+              </div>
 
+              {activeLibraryTab === 'personal' && (
                 <div className="flex items-center justify-between gap-2 mb-6">
                   <div className="flex flex-wrap items-center gap-2">
                     {librariesLoading ? (
@@ -419,8 +440,6 @@ export function LibraryView() {
                         const isActive = library.id === activeLibraryGroupId
                         const btnClass = isActive ? 'bg-black text-white hover:bg-black/90' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
 
-                        // Render only the library selector button here. The edit/delete controls
-                        // are shown once for the currently selected (real) library below.
                         return (
                           <Button
                             key={library.id}
@@ -435,13 +454,11 @@ export function LibraryView() {
                     )}
                   </div>
 
-                  {/* Single edit/delete controls for the selected real library */}
                   <div className="flex items-center gap-2">
                     {libraries.length > 0 ? (
                       <>
                         <Button size="sm" variant="ghost" onClick={() => {
                           setManageAction('edit')
-                          // default selection to currently active real library if present
                           const defaultLib = libraries.some(l => l._id === activeLibraryGroupId) ? activeLibraryGroupId : (libraries[0]?._id ?? null)
                           setSelectedManageLibraryId(defaultLib)
                           setShowManageLibraryModal(true)
@@ -461,80 +478,86 @@ export function LibraryView() {
                     ) : null}
                   </div>
                 </div>
+              )}
 
-                {/* Filters */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    {/* Category Filter */}
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm font-medium text-gray-700">Category:</label>
-                      <select
-                        value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
-                      >
-                        {categories.map(category => (
-                          <option key={category} value={category}>
-                            {category.charAt(0).toUpperCase() + category.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Sort Filter */}
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm font-medium text-gray-700">Sort:</label>
-                      <select
-                        value={sortOrder}
-                        onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-                        className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
-                      >
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                      </select>
-                    </div>
+              {/* Filters */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  {/* Category Filter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Category:</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                    >
+                      {categories.map(category => (
+                        <option key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* Search */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search library items..."
-                      className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 text-sm"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                  {/* Sort Filter */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Sort:</label>
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
+                      className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400"
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              {/* Library Items Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                {loading ? (
-                  <div className="col-span-full text-center py-12">
-                    <p className="text-sm text-gray-500">Loading library items...</p>
-                  </div>
-                ) : filteredItems.length === 0 ? (
-                  <div className="col-span-full text-center py-12">
-                    <p className="text-sm text-gray-500">No library items found</p>
-                    <p className="text-xs text-gray-400 mt-1">Create your first library item to get started</p>
-                  </div>
-                ) : (
-                  filteredItems.map((item) => (
-                    <Card key={item.id} className="bg-white shadow-sm hover:shadow-md transition-all border-neutral-200 group overflow-hidden">
-                      <CardContent className="p-0">
-                        <div className="relative">
-                          {item.multimedia && item.multimedia.length > 0 ? (
-                            <img
-                              src={item.multimedia[0]}
-                              alt={item.title}
-                              className="w-full h-28 object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-gray-300">
-                              {getIcon(item.type)}
-                            </div>
-                          )}
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search library items..."
+                    className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Library Items Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              {loading ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-sm text-gray-500">Loading library items...</p>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-sm text-gray-500">No library items found</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {activeLibraryTab === 'personal'
+                      ? 'Create your first library item to get started'
+                      : 'Global products will appear here'}
+                  </p>
+                </div>
+              ) : (
+                filteredItems.map((item) => (
+                  <Card key={item.id} className="bg-white shadow-sm hover:shadow-md transition-all border-neutral-200 group overflow-hidden">
+                    <CardContent className="p-0">
+                      <div className="relative">
+                        {item.multimedia && item.multimedia.length > 0 ? (
+                          <img
+                            src={item.multimedia[0]}
+                            alt={item.title}
+                            className="w-full h-28 object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-gray-300">
+                            {getIcon(item.type)}
+                          </div>
+                        )}
+                        {(activeLibraryTab === 'personal' || isAdmin) && (
                           <div className="absolute top-1.5 right-1.5 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button
                               onClick={() => handleEditItem(dbItems.find(dbItem => dbItem._id === item.id))}
@@ -551,41 +574,36 @@ export function LibraryView() {
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </div>
-                          <div className="absolute bottom-1.5 left-1.5">
-                            <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wider">
-                              {item.type}
-                            </span>
-                          </div>
+                        )}
+                        <div className="absolute bottom-1.5 left-1.5">
+                          <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wider">
+                            {item.type}
+                          </span>
                         </div>
-                        <div className="p-2.5">
-                          <h3 className="font-semibold text-gray-900 text-xs mb-0.5 truncate" title={item.title}>{item.title}</h3>
-                          {item.location && (
-                            <p className="text-[10px] text-gray-500 mb-1.5 flex items-center">
-                              <MapPin className="h-2.5 w-2.5 mr-0.5 shrink-0" />
-                              <span className="truncate">{item.location}</span>
-                            </p>
+                      </div>
+                      <div className="p-2.5">
+                        <h3 className="font-semibold text-gray-900 text-xs mb-0.5 truncate" title={item.title}>{item.title}</h3>
+                        {item.location && (
+                          <p className="text-[10px] text-gray-500 mb-1.5 flex items-center">
+                            <MapPin className="h-2.5 w-2.5 mr-0.5 shrink-0" />
+                            <span className="truncate">{item.location}</span>
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-50">
+                          <span className="text-[9px] text-gray-400 font-medium">
+                            {format(new Date(item.date), 'MMM dd, yyyy')}
+                          </span>
+                          {item.multimedia && item.multimedia.length > 1 && (
+                            <span className="text-[9px] bg-gray-100 text-gray-600 px-1 rounded">+{item.multimedia.length - 1}</span>
                           )}
-                          <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-gray-50">
-                            <span className="text-[9px] text-gray-400 font-medium">
-                              {format(new Date(item.date), 'MMM dd, yyyy')}
-                            </span>
-                            {item.multimedia && item.multimedia.length > 1 && (
-                              <span className="text-[9px] bg-gray-100 text-gray-600 px-1 rounded">+{item.multimedia.length - 1}</span>
-                            )}
-                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
             </div>
-          ) : (
-            <div className="text-center py-12">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">Global Library</h2>
-              <p className="text-sm text-gray-500">Coming Soon...</p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -595,9 +613,9 @@ export function LibraryView() {
         onClose={() => setShowSelectCategoryModal(false)}
         onItemCreated={() => {
           setShowSelectCategoryModal(false)
-          toast.success('Library item created successfully')
         }}
         defaultLibraryId={libraries.some(lib => lib._id === activeLibraryGroupId) ? activeLibraryGroupId : undefined}
+        defaultIsGlobal={activeLibraryTab === 'public'}
       />
 
       {/* Add/Edit Modal */}

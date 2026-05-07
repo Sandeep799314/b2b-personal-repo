@@ -1,9 +1,13 @@
+import { getAuthHeaders } from "@/lib/client-auth";
+
 // Save quotation version
 export const saveQuotationVersion = async (quotationId: string, quotationData?: any) => {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`/api/quotations/${quotationId}/save`, {
       method: 'POST',
       headers: {
+        ...headers,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(quotationData || {}),

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Calendar, MapPin, Clock, Edit, Package, ShoppingCart, FileText, Users, DollarSign, Share2, Copy, FileDigit, Loader2, Trash2, MoreVertical, Eye, Sun, Moon, History, X, Search } from "lucide-react"
+import { Plus, Calendar, MapPin, Clock, Edit, Package, ShoppingCart, FileText, Users, DollarSign, Share2, Copy, FileDigit, Loader2, Trash2, MoreVertical, Eye, Sun, Moon, History, X, Search, LayoutGrid, List } from "lucide-react"
 import { IItinerary } from "@/models/Itinerary"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -23,6 +23,7 @@ import { useQuotations } from "@/hooks/use-quotations"
 import { getAuthHeaders } from "@/lib/client-auth"
 import { getDefaultImageByString } from "@/lib/constants"
 import { UserWallet } from "./user-wallet"
+import { cn } from "@/lib/utils"
 
 interface ItineraryListProps {
   onCreateNew: () => void
@@ -67,6 +68,7 @@ export function ItineraryList({
   const [searchQuery, setSearchQuery] = useState("")
   const [itineraries, setItineraries] = useState<IItinerary[]>([])
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedItinerary, setSelectedItinerary] = useState<IItinerary | null>(null)
   const [clientInfo, setClientInfo] = useState({ name: "", email: "", phone: "", referenceNo: "", notes: "" })
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
@@ -292,7 +294,7 @@ export function ItineraryList({
         </div>
       </div>
 
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400 h-4 w-4" />
           <Input
@@ -303,9 +305,38 @@ export function ItineraryList({
             className="pl-10"
           />
         </div>
+
+        <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-md border shrink-0 h-9">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-7 w-8 p-0 rounded-sm transition-all",
+              viewMode === "grid" ? "bg-white shadow-sm text-brand-600" : "text-neutral-500 hover:text-neutral-900"
+            )}
+            onClick={() => setViewMode("grid")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-7 w-8 p-0 rounded-sm transition-all",
+              viewMode === "list" ? "bg-white shadow-sm text-brand-600" : "text-neutral-500 hover:text-neutral-900"
+            )}
+            onClick={() => setViewMode("list")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+      <div className={cn(
+        viewMode === 'grid' 
+          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start"
+          : "flex flex-col gap-3"
+      )}>
         {filteredItineraries.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-300" />
@@ -335,6 +366,129 @@ export function ItineraryList({
             const nightsCount = (itinerary.days?.reduce((acc, day) => acc + (day.nights || 0), 0)) || 
                                Math.max(0, (itinerary.days?.length || (parseInt(itinerary.duration) || 1)) - 1)
 
+            if (viewMode === 'list') {
+              return (
+                <Card
+                  key={itinerary._id}
+                  className="hover:shadow-md transition-all duration-300 group border-neutral-200 hover:border-brand-200 overflow-hidden"
+                >
+                  <div className="flex flex-row items-stretch h-24 md:h-28">
+                    {/* Thumbnail */}
+                    <div className="w-24 md:w-32 shrink-0 bg-neutral-100 relative overflow-hidden">
+                      <img
+                        src={displayImage}
+                        alt={itinerary.title}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-1 left-1">
+                        <Badge className={`${typeConfig.color} border-none text-[8px] px-1.5 py-0 rounded-full bg-opacity-90 backdrop-blur-sm`}>
+                          <TypeIcon className="h-2 w-2 mr-1" />
+                          {typeConfig.label.split(' ')[0]}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 flex flex-row items-center p-3 gap-4 min-w-0">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h3 className="font-bold text-sm md:text-base text-neutral-900 truncate group-hover:text-brand-700 transition-colors">
+                            {itinerary.title}
+                          </h3>
+                          {itinerary.productReferenceCode && (
+                            <span className="text-[9px] font-bold text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded border border-brand-100 uppercase tracking-wide">
+                              {itinerary.productReferenceCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-neutral-500">
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate max-w-[120px]">{itinerary.destination || "Multiple"}</span>
+                          </div>
+                          <div className="flex items-center gap-1 font-medium">
+                            <Sun className="h-3 w-3 text-amber-500" />
+                            <span>{daysCount}D / {nightsCount}N</span>
+                          </div>
+                          <div className="hidden sm:flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatLogDate(itinerary.updatedAt).split(' : ')[0]}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Price Section */}
+                      <div className="shrink-0 text-right px-2 hidden sm:block border-x border-neutral-100 min-w-[100px] flex items-center justify-center">
+                        <p className="font-black text-lg text-neutral-900 tracking-tight">
+                          {itinerary.totalPrice > 0 ? (
+                            new Intl.NumberFormat('en-US', {
+                              style: 'currency',
+                              currency: itinerary.currency || 'USD',
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            }).format(itinerary.totalPrice)
+                          ) : (
+                            <span className="text-neutral-400 font-bold text-xs uppercase">On Request</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 pl-2">
+                        {selectForQuotation ? (
+                          <Button
+                            size="sm"
+                            className="bg-amber-400 hover:bg-amber-500 text-black font-bold h-8 px-4"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleItinerarySelect(itinerary);
+                            }}
+                          >
+                            Select
+                          </Button>
+                        ) : (
+                          <>
+                            <div className="hidden md:flex items-center gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-400 hover:text-brand-600 hover:bg-brand-50" onClick={() => onViewItinerary(itinerary._id!)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-400 hover:text-brand-600 hover:bg-brand-50" onClick={() => onEditItinerary(itinerary._id!)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-400 hover:text-brand-600 hover:bg-brand-50" onClick={() => createQuickShare(itinerary)}>
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-neutral-400 hover:text-neutral-900">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem className="md:hidden" onClick={() => onViewItinerary(itinerary._id!)}>
+                                  <Eye className="mr-2 h-4 w-4" /> View Itinerary
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="md:hidden" onClick={() => onEditItinerary(itinerary._id!)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Edit Itinerary
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="md:hidden" onClick={() => createQuickShare(itinerary)}>
+                                  <Share2 className="mr-2 h-4 w-4" /> Share Link
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteClick(itinerary)} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )
+            }
+
             return (
               <Card
                 key={itinerary._id}
@@ -350,11 +504,17 @@ export function ItineraryList({
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   
                   {/* Category Badge */}
-                  <div className="absolute top-3 right-3">
+                  <div className="absolute top-3 right-3 flex gap-1.5">
                     <Badge className={`${typeConfig.color} shadow-sm border-none text-[10px] font-medium px-2.5 py-1 rounded-full backdrop-blur-md bg-opacity-90`}>
                       <TypeIcon className="h-3 w-3 mr-1.5" />
                       {typeConfig.label}
                     </Badge>
+                    {itinerary.fixedScheduleEvents && itinerary.fixedScheduleEvents.length > 0 && (
+                      <Badge className="bg-amber-100/90 border-amber-200 text-amber-800 shadow-sm text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border border-amber-200">
+                        <Calendar className="h-3 w-3 mr-1.5" />
+                        Fixed Date
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -516,8 +676,7 @@ export function ItineraryList({
                         )}
                       </div>
 
-                      <div className="shrink-0 flex flex-col items-end">
-                        <span className="text-[10px] text-neutral-400 uppercase font-bold tracking-[0.1em] mb-0.5">Total Cost</span>
+                      <div className="shrink-0 flex flex-col items-end justify-center">
                         <div className="text-2xl font-black text-neutral-900 tracking-tighter leading-none">
                           {itinerary.totalPrice > 0 ? (
                             new Intl.NumberFormat('en-US', {

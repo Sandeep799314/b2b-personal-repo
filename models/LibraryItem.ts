@@ -54,6 +54,7 @@ const baseSchemaDefinition = {
   // Flexible field for any additional data
   extraFields: { type: mongoose.Schema.Types.Mixed, default: {} },
   libraryCollection: libraryCollectionField,
+  isGlobal: { type: Boolean, default: false },
   userId: { type: String, index: true },
   userEmail: { type: String },
 }

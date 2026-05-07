@@ -12,6 +12,18 @@ export const premiumTemplates = [
     preview: '/placeholder.svg?height=200&width=300',
     elements: [
       {
+        id: 'brand-header',
+        type: 'brand-header',
+        content: {},
+        position: { x: 0, y: 0 },
+        size: { width: 640, height: 80 },
+        style: {
+          backgroundColor: '#ffffff',
+          padding: 20,
+          borderBottom: '1px solid #e2e8f0'
+        }
+      },
+      {
         id: 'day-header',
         type: 'heading',
         content: { text: 'Day 1 - Arrival & Marina Bay' },
@@ -380,6 +392,140 @@ export const premiumTemplates = [
           backgroundColor: '#fee2e2',
           borderRadius: 8,
           border: '2px solid #ef4444',
+          padding: 16
+        }
+      }
+    ]
+  },
+  {
+    id: 'luxury-resort-stay',
+    name: 'Luxury Resort Stay',
+    preview: '/placeholder.svg?height=200&width=300',
+    elements: [
+      {
+        id: 'day-header',
+        type: 'heading',
+        content: { text: 'Day 4 - Relaxation & Luxury' },
+        position: { x: 20, y: 20 },
+        size: { width: 600, height: 40 },
+        style: {
+          fontSize: 24,
+          fontWeight: 'bold',
+          color: '#be123c',
+          backgroundColor: '#fff1f2',
+          padding: 12,
+          borderRadius: 8,
+          textAlign: 'left'
+        }
+      },
+      {
+        id: 'resort-event',
+        type: 'event',
+        content: {
+          category: 'Hotel',
+          title: 'Premium Villa Check-in',
+          description: 'Private infinity pool villa with ocean view',
+          time: '2:00 PM',
+          duration: 'Overnight',
+          price: 1200,
+          location: 'Ocean Whisper Resort',
+          includes: ['Butler Service', 'Welcome Champagne', 'Private Pool']
+        },
+        position: { x: 20, y: 80 },
+        size: { width: 600, height: 120 },
+        style: {
+          backgroundColor: '#fff1f2',
+          borderRadius: 8,
+          border: '2px solid #fb7185',
+          padding: 16
+        }
+      },
+      {
+        id: 'dinner-event',
+        type: 'event',
+        content: {
+          category: 'Dining',
+          title: 'Candlelight Beach Dinner',
+          description: '5-course gourmet seafood dinner on the sand',
+          time: '7:30 PM',
+          duration: '3 hours',
+          price: 250,
+          location: 'Resort Private Beach',
+          includes: ['Wine Pairing', 'Live Acoustic Music', 'Private Chef']
+        },
+        position: { x: 20, y: 220 },
+        size: { width: 600, height: 120 },
+        style: {
+          backgroundColor: '#fafaf9',
+          borderRadius: 8,
+          border: '2px solid #a8a29e',
+          padding: 16
+        }
+      }
+    ]
+  },
+  {
+    id: 'mountain-expedition',
+    name: 'Mountain Expedition',
+    preview: '/placeholder.svg?height=200&width=300',
+    elements: [
+      {
+        id: 'day-header',
+        type: 'heading',
+        content: { text: 'Day 5 - Peak Challenge' },
+        position: { x: 20, y: 20 },
+        size: { width: 600, height: 40 },
+        style: {
+          fontSize: 24,
+          fontWeight: 'bold',
+          color: '#15803d',
+          backgroundColor: '#f0fdf4',
+          padding: 12,
+          borderRadius: 8,
+          textAlign: 'left'
+        }
+      },
+      {
+        id: 'hiking-event',
+        type: 'event',
+        content: {
+          category: 'Activity',
+          title: 'Summit Sunrise Hike',
+          description: 'Challenging pre-dawn trek to the highest peak',
+          time: '4:00 AM',
+          duration: '5 hours',
+          price: 150,
+          location: 'Evergreen Peak',
+          includes: ['Expert Mountaineer Guide', 'Headlamps Provided', 'Summit Breakfast']
+        },
+        position: { x: 20, y: 80 },
+        size: { width: 600, height: 120 },
+        style: {
+          backgroundColor: '#f0fdf4',
+          borderRadius: 8,
+          border: '2px solid #4ade80',
+          padding: 16
+        }
+      },
+      {
+        id: 'lodge-event',
+        type: 'event',
+        content: {
+          category: 'Hotel',
+          title: 'Alpine Eco-Lodge',
+          description: 'Sustainable lodging with panoramic mountain views',
+          time: '3:00 PM',
+          duration: 'Overnight',
+          price: 350,
+          location: 'Peak Vista Lodge',
+          includes: ['Eco-friendly Amenities', 'Fireplace', 'Heated Blankets']
+        },
+        position: { x: 20, y: 220 },
+        size: { width: 600, height: 120 },
+        style: {
+          backgroundColor: '#eff6ff',
+          borderRadius: 8,
+          border: '2px solid #60a5fa',
           padding: 16
         }
       }

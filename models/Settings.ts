@@ -10,11 +10,18 @@ const CurrencySettingsSchema = new mongoose.Schema({
 })
 
 const BrandingSettingsSchema = new mongoose.Schema({
+    id: { type: String, required: true },
     logo: String,
     companyName: String,
     contactEmail: String,
     contactPhone: String,
     address: String,
+    gst: String,
+    isDefault: { type: Boolean, default: false },
+    headerImage: String,
+    footerImage: String,
+    headerText: String,
+    footerText: String,
     socialLinks: {
         instagram: String,
         whatsapp: String,
@@ -32,7 +39,8 @@ const SettingsSchema = new mongoose.Schema({
     type: { type: String, default: "global", unique: true },
 
     currency: { type: CurrencySettingsSchema, default: () => ({}) },
-    branding: { type: BrandingSettingsSchema, default: () => ({}) }
+    branding: { type: BrandingSettingsSchema },
+    companies: { type: [BrandingSettingsSchema], default: [] }
 }, {
     timestamps: true
 })

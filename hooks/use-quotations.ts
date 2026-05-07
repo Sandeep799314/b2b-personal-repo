@@ -31,6 +31,7 @@ export interface QuotationData {
   totalPrice: number
   currency: string
   status: "draft" | "sent" | "accepted" | "rejected" | "expired"
+  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback"
   pricingOptions: QuotationPricingOptions
   client: QuotationClientInfo
   generatedDate: Date
@@ -153,23 +154,32 @@ export function useQuotations() {
     setError(null)
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/quotations/${id}`, {
         method: "PUT",
         headers: {
+          ...headers,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to update quotation")
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to update quotation")
       }
 
       const updatedQuotation = await response.json()
 
-      // Update local state
+      // Update local state with robust matching and merging
       setQuotations((prev) =>
-        prev.map((q) => (q._id === id ? updatedQuotation : q))
+        prev.map((q) => {
+          const match = q._id === id || (q._id && id && q._id.toString() === id.toString());
+          if (match) {
+            return { ...q, ...updatedQuotation };
+          }
+          return q;
+        })
       )
 
       toast({
@@ -178,12 +188,12 @@ export function useQuotations() {
       })
 
       return updatedQuotation
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating quotation:", error)
-      setError("Failed to update quotation")
+      setError(error.message || "Failed to update quotation")
       toast({
         title: "Error",
-        description: "Failed to update quotation",
+        description: error.message || "Failed to update quotation",
         variant: "destructive",
       })
       return null
@@ -198,12 +208,15 @@ export function useQuotations() {
     setError(null)
 
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`/api/quotations/${id}`, {
         method: "DELETE",
+        headers,
       })
 
       if (!response.ok) {
-        throw new Error("Failed to delete quotation")
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete quotation")
       }
 
       // Update local state
@@ -215,12 +228,12 @@ export function useQuotations() {
       })
 
       return true
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting quotation:", error)
-      setError("Failed to delete quotation")
+      setError(error.message || "Failed to delete quotation")
       toast({
         title: "Error",
-        description: "Failed to delete quotation",
+        description: error.message || "Failed to delete quotation",
         variant: "destructive",
       })
       return false

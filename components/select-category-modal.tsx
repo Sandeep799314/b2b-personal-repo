@@ -35,13 +35,28 @@ interface SelectCategoryModalProps {
   onItemCreated: () => void
   editingItem?: any
   defaultLibraryId?: string
+  defaultIsGlobal?: boolean
 }
 
-export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingItem, defaultLibraryId }: SelectCategoryModalProps) {
+export function SelectCategoryModal({ 
+  isOpen, 
+  onClose, 
+  onItemCreated, 
+  editingItem, 
+  defaultLibraryId,
+  defaultIsGlobal = false
+}: SelectCategoryModalProps) {
   const [selectedCategory, setSelectedCategory] = useState("Flights")
   const [isSaving, setIsSaving] = useState(false)
-  const { createItem, updateItem, libraries } = useLibrary()
+  const { createItem, updateItem, libraries, isAdmin } = useLibrary()
   const [targetLibraryId, setTargetLibraryId] = useState<string>("")
+  const [isGlobal, setIsGlobal] = useState(defaultIsGlobal)
+
+  useEffect(() => {
+    if (isOpen && !editingItem) {
+      setIsGlobal(defaultIsGlobal)
+    }
+  }, [isOpen, defaultIsGlobal, editingItem])
 
   useEffect(() => {
     if (defaultLibraryId) {
@@ -151,6 +166,7 @@ export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingIte
   // Populate form when editing
   useEffect(() => {
     if (editingItem) {
+      setIsGlobal(editingItem.isGlobal || false)
       // Map basic fields
       const baseForm: Partial<IItineraryEvent> = {
         title: editingItem.title || "",
@@ -675,6 +691,7 @@ export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingIte
         basePrice: Number(itemForm.price) || 0,
         currency: itemForm.currency || "USD",
         multimedia: itemForm.imageUrl ? [itemForm.imageUrl] : [],
+        isGlobal: isGlobal,
         // Crucial: Store the ENTIRE detailed form state in extraFields for persistence
         extraFields: {
           ...itemForm,
@@ -683,16 +700,24 @@ export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingIte
         }
       }
 
+      if (!editingItem) {
+        const confirmed = window.confirm("Creating this library product will cost 1 credit. Do you want to proceed?")
+        if (!confirmed) {
+          setIsSaving(false) // Reset loading state so button is usable again
+          return // STOP everything here. No API call, no credit deduction.
+        }
+      }
+
       if (editingItem) {
         await updateItem(editingItem.id || editingItem._id, newItem)
         toast.success("Item updated successfully")
       } else {
         await createItem(newItem)
-        // Trigger credit deduction animation for new library product
+        // Only if API call above succeeds, we proceed to trigger UI animations
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('credits-deducted', { detail: { amount: 1 } }));
         }
-        toast.success("Item created successfully")
+        toast.success("Item created successfully (1 credit deducted)")
       }
 
       onItemCreated()
@@ -793,13 +818,28 @@ export function SelectCategoryModal({ isOpen, onClose, onItemCreated, editingIte
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3 sticky bottom-0 z-10">
-          <Button variant="outline" onClick={onClose} disabled={isSaving}>
-            Cancel
-          </Button>
-          <Button onClick={handleCreate} disabled={isSaving} className="bg-black text-white hover:bg-gray-800">
-            {isSaving ? "Saving..." : editingItem ? "Update Item" : "Create Item"}
-          </Button>
+        <div className="p-4 border-t bg-gray-50 flex items-center justify-between sticky bottom-0 z-10">
+          <div className="flex items-center">
+            {isAdmin && (
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={isGlobal}
+                  onChange={(e) => setIsGlobal(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black transition-colors"
+                />
+                <span className="text-sm font-medium text-gray-700 group-hover:text-black transition-colors">Make Global (Visible to everyone)</span>
+              </label>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={isSaving} className="bg-black text-white hover:bg-gray-800">
+              {isSaving ? "Saving..." : editingItem ? "Update Item" : "Create Item"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

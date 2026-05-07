@@ -95,13 +95,7 @@ export async function POST(
       currentVersion = quotation.versionHistory[versionIndex].versionNumber;
     }
 
-    // 3. Finalize and LOCK the current version with its current (old) state
-    quotation.versionHistory[versionIndex].state = stateBeforeUpdate
-    quotation.versionHistory[versionIndex].isDraft = false
-    quotation.versionHistory[versionIndex].isLocked = true
-    quotation.versionHistory[versionIndex].createdAt = new Date()
-
-    // 4. Update Quotation Fields from Payload
+    // 3. Update Quotation Fields from Payload
     if (Object.keys(payload).length > 0) {
       const allowedUpdates = [
         "days", "pricingOptions", "client", "currencySettings",
@@ -119,22 +113,12 @@ export async function POST(
       });
     }
 
-    // 5. Capture the state AFTER applying updates (this belongs to the new version)
+    // 4. Update the state of the CURRENT version with the NEW state
     const stateAfterUpdate = snapshotQuotationState(quotation)
-
-    // 6. Create the NEXT version with the new state
-    const nextVersionNumber = quotation.versionHistory.length + 1
-    quotation.versionHistory.push({
-      versionNumber: nextVersionNumber,
-      createdAt: new Date(),
-      description: `Draft for version ${nextVersionNumber}`,
-      isLocked: false,
-      isDraft: true,
-      state: stateAfterUpdate
-    })
-
-    // 7. Update top-level current version info
-    quotation.currentVersion = nextVersionNumber
+    quotation.versionHistory[versionIndex].state = stateAfterUpdate
+    quotation.versionHistory[versionIndex].createdAt = new Date()
+    
+    // 5. Ensure it's still marked as draft at the top level
     quotation.isDraft = true
     
     // Mark fields as modified for Mongoose

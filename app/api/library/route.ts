@@ -13,15 +13,11 @@ export async function GET(request: NextRequest) {
     // Verify authentication
     const user = await verifyAuth(request);
     
-    // Build query - Filter by userId or return items with no userId (public/legacy)
-    const query = user ? { 
+    // Build query: User's items OR items with no userId OR global items
+    const query = { 
       $or: [
-        { userId: user.uid },
-        { userId: { $exists: false } },
-        { userId: null }
-      ]
-    } : {
-      $or: [
+        { isGlobal: true },
+        ...(user ? [{ userId: user.uid }] : []),
         { userId: { $exists: false } },
         { userId: null }
       ]
@@ -111,6 +107,18 @@ export async function POST(request: NextRequest) {
     // Inject user fields
     cleanData.userId = user.uid;
     cleanData.userEmail = user.email;
+
+    // Handle isGlobal based on ADMIN_EMAIL
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const isCurrentUserAdmin = adminEmail && user.email && 
+      user.email.toLowerCase().trim() === adminEmail.toLowerCase().trim();
+
+    if (isCurrentUserAdmin) {
+      // Admin can set isGlobal if they want, or we can default to true if the request says so
+      cleanData.isGlobal = data.isGlobal === true;
+    } else {
+      cleanData.isGlobal = false;
+    }
 
     const item = await LibraryItem.create(cleanData)
     

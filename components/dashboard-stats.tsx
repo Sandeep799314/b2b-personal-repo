@@ -1,6 +1,6 @@
 import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, FileText, CheckCircle, Clock } from "lucide-react"
+import { IndianRupee, FileText, CheckCircle2, TrendingUp } from "lucide-react"
 
 interface DashboardStatsProps {
     quotations: any[]
@@ -20,59 +20,71 @@ export function DashboardStats({ quotations }: DashboardStatsProps) {
         ? Math.round((convertedQuotations / totalQuotations) * 100)
         : 0
 
+    const formatValue = (val: number) => {
+        return `₹${val.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+    }
+
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Pipeline Value</CardTitle>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        {totalValue.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                    <CardTitle className="text-sm font-semibold text-slate-600">Total Pipeline Value</CardTitle>
+                    <div className="p-2 bg-brand-primary-50 rounded-lg">
+                        <IndianRupee className="h-4 w-4 text-brand-primary-600" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        Across all {totalQuotations} quotations
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold text-slate-900">
+                        {formatValue(totalValue)}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                        ACROSS {totalQuotations} QUOTATIONS
                     </p>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Active Quotations</CardTitle>
-                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-semibold text-slate-600">Active Proposals</CardTitle>
+                    <div className="p-2 bg-blue-50 rounded-lg">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{activeQuotations}</div>
-                    <p className="text-xs text-muted-foreground">
-                        Drafts and sent quotes
+                    <div className="text-2xl font-bold text-slate-900">{activeQuotations}</div>
+                    <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                        DRAFTS AND SENT QUOTES
                     </p>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-semibold text-slate-600">Conversion Rate</CardTitle>
+                    <div className="p-2 bg-emerald-50 rounded-lg">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">{conversionRate}%</div>
-                    <p className="text-xs text-muted-foreground">
-                        {convertedQuotations} accepted quotes
+                    <div className="text-2xl font-bold text-slate-900">{conversionRate}%</div>
+                    <p className="text-[11px] text-slate-400 mt-1 font-medium uppercase">
+                        {convertedQuotations} ACCEPTED CONTRACTS
                     </p>
                 </CardContent>
             </Card>
-            <Card>
+            <Card className="border-slate-200 shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg. Deal Size</CardTitle>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-semibold text-slate-600">Average Deal Size</CardTitle>
+                    <div className="p-2 bg-amber-50 rounded-lg">
+                        <TrendingUp className="h-4 w-4 text-amber-600" />
+                    </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold text-slate-900">
                         {totalQuotations > 0
-                            ? (totalValue / totalQuotations).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-                            : '$0'}
+                            ? formatValue(totalValue / totalQuotations)
+                            : '₹0'}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        Per quotation
+                    <p className="text-[11px] text-slate-400 mt-1 font-medium">
+                        PER OPPORTUNITY
                     </p>
                 </CardContent>
             </Card>

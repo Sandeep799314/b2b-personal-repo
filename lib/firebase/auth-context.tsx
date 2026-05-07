@@ -10,7 +10,7 @@ import {
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     signOut as firebaseSignOut,
-    onAuthStateChanged,
+    onIdTokenChanged,
 } from 'firebase/auth';
 import { auth } from './config';
 import { useRouter } from 'next/navigation';
@@ -36,11 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error('Error getting redirect result:', error);
         });
 
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        const unsubscribe = onIdTokenChanged(auth, async (user) => {
             setCurrentUser(user);
 
             if (user) {
                 // Get fresh ID token and store in cookie
+                // onIdTokenChanged fires when the token is refreshed
                 const idToken = await user.getIdToken();
                 document.cookie = `firebase-auth-token=${idToken}; path=/; max-age=3600; SameSite=Lax`;
             } else {

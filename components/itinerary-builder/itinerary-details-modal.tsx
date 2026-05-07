@@ -8,7 +8,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IItinerary } from "@/models/Itinerary"
-import { Upload, X } from "lucide-react"
+import { Upload, X, Building2 } from "lucide-react"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 interface ItineraryDetailsModalProps {
     isOpen: boolean
@@ -19,7 +26,8 @@ interface ItineraryDetailsModalProps {
     onSave: (
         guestDetails: IItinerary['guestDetails'], 
         agencyDetails: IItinerary['agencyDetails'],
-        headerFooter: IItinerary['headerFooter']
+        headerFooter: IItinerary['headerFooter'],
+        entityId?: string
     ) => void
 }
 
@@ -32,6 +40,8 @@ export function ItineraryDetailsModal({
     onSave,
 }: ItineraryDetailsModalProps) {
     const [activeTab, setActiveTab] = useState("guest")
+    const [allCompanies, setAllCompanies] = useState<any[]>([])
+    const [selectedEntityId, setSelectedEntityId] = useState<string>("")
 
     // Guest State
     const [guestData, setGuestData] = useState({
@@ -59,6 +69,60 @@ export function ItineraryDetailsModal({
         showOnAllPages: true,
     })
 
+    // Load companies
+    useEffect(() => {
+        if (isOpen) {
+            fetchCompanies()
+        }
+    }, [isOpen])
+
+    const fetchCompanies = async () => {
+        try {
+            const res = await fetch("/api/settings")
+            if (res.ok) {
+                const data = await res.json()
+                let companies = data.companies || []
+                
+                // Ensure global branding is in the list
+                if (data.branding?.companyName) {
+                    const defaultExists = companies.some((c: any) => c.id === "default" || c.companyName === data.branding.companyName)
+                    if (!defaultExists) {
+                        companies = [{ ...data.branding, id: data.branding.id || "default", isDefaultBrand: true }, ...companies]
+                    }
+                }
+                
+                setAllCompanies(companies)
+            }
+        } catch (error) {
+            console.error("Failed to fetch companies", error)
+        }
+    }
+
+    const handleEntitySelect = (entityId: string) => {
+        setSelectedEntityId(entityId)
+        const selected = allCompanies.find(c => c.id === entityId)
+        if (selected) {
+            setAgencyData({
+                logo: selected.logo || "",
+                name: selected.companyName || "",
+                address: selected.address || "",
+                phone: selected.contactPhone || "",
+                email: selected.contactEmail || "",
+                gst: selected.gst || "",
+            })
+
+            // Also optionally update header/footer if they are provided in the entity
+            if (selected.headerImage || selected.footerImage || selected.footerText) {
+                setHeaderFooterData(prev => ({
+                    ...prev,
+                    headerImage: selected.headerImage || prev.headerImage,
+                    footerImage: selected.footerImage || prev.footerImage,
+                    contactInfo: selected.footerText || prev.contactInfo,
+                }))
+            }
+        }
+    }
+
     // Load data when modal opens
     useEffect(() => {
         if (isOpen) {
@@ -84,11 +148,17 @@ export function ItineraryDetailsModal({
                 contactInfo: headerFooter?.contactInfo || "",
                 showOnAllPages: headerFooter?.showOnAllPages !== false,
             })
+
+            // If agency name matches one of the companies, pre-select it
+            if (agencyDetails?.name && allCompanies.length > 0) {
+                const match = allCompanies.find(c => c.companyName === agencyDetails.name)
+                if (match) setSelectedEntityId(match.id)
+            }
         }
-    }, [isOpen, guestDetails, agencyDetails, headerFooter])
+    }, [isOpen, guestDetails, agencyDetails, headerFooter, allCompanies])
 
     const handleSave = () => {
-        onSave(guestData, agencyData, headerFooterData)
+        onSave(guestData, agencyData, headerFooterData, selectedEntityId)
         onClose()
     }
 
@@ -166,6 +236,27 @@ export function ItineraryDetailsModal({
                     </TabsContent>
 
                     <TabsContent value="agency" className="space-y-4 py-4">
+                        {/* Entity Selection */}
+                        {allCompanies.length > 0 && (
+                            <div className="space-y-3 p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                                <div className="flex items-center space-x-2">
+                                    <Building2 className="h-4 w-4 text-emerald-500" />
+                                    <Label className="text-sm font-semibold">Quick Select Entity Profile</Label>
+                                </div>
+                                <Select value={selectedEntityId} onValueChange={handleEntitySelect}>
+                                    <SelectTrigger className="w-full bg-white">
+                                        <SelectValue placeholder="Choose an entity to auto-fill details..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {allCompanies.map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[10px] text-neutral-500 italic">Selecting an entity will automatically fill the fields below.</p>
+                            </div>
+                        )}
+
                         {/* Logo Upload */}
                         <div className="flex items-center gap-4">
                             <div className="relative h-20 w-20 rounded-md border border-dashed flex items-center justify-center overflow-hidden bg-gray-50">

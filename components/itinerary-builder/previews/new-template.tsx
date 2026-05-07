@@ -207,8 +207,36 @@ export default function NewTemplate({
     "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80"
   ];
 
+  const headerImage = itinerary.headerFooter?.headerImage || itinerary.branding?.headerImage
+  const footerImage = itinerary.headerFooter?.footerImage || itinerary.branding?.footerImage
+
   return (
     <div style={{ fontFamily: "Georgia, serif", background: "#fff", minHeight: "100vh", color: "#1a1a1a" }}>
+      {/* Header Bar */}
+      <div style={{
+        padding: "20px 32px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        backgroundImage: headerImage ? `linear-gradient(rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.92)), url(${headerImage})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        borderBottom: "0.5px solid #eee"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {itinerary.branding?.logo && (
+            <img src={itinerary.branding.logo} alt="Logo" style={{ height: 40, width: "auto" }} />
+          )}
+          <h4 style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 400, color: "#1a1a1a", margin: 0 }}>
+            {itinerary.branding?.companyName || "TRAV PLATFORMS"}
+          </h4>
+        </div>
+        <div style={{ textAlign: "right", fontSize: 10, color: "#666", fontFamily: "sans-serif" }}>
+          {itinerary.branding?.contactEmail && <div>{itinerary.branding.contactEmail}</div>}
+          {itinerary.branding?.contactPhone && <div>{itinerary.branding.contactPhone}</div>}
+        </div>
+      </div>
+
       {/* Hero */}
       <div style={{ position: "relative", height: 360, overflow: "hidden" }}>
         <img
@@ -475,11 +503,15 @@ export default function NewTemplate({
 
       {/* Footer */}
       <div style={{
-        borderTop: "0.5px solid #eee", padding: "16px 20px",
+        borderTop: "0.5px solid #eee", padding: "32px 20px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
+        backgroundImage: footerImage ? `linear-gradient(rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.15)), url(${footerImage})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        textShadow: footerImage ? "0 1px 2px rgba(255,255,255,0.8)" : "none"
       }}>
-        <h4 style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 400, color: "#1a1a1a" }}>{itinerary.branding?.companyName || "TRAV PLATFORMS"}</h4>
-        <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#888", fontFamily: "sans-serif" }}>© {new Date().getFullYear()} ALL RIGHTS RESERVED</p>
+        <h4 style={{ fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 400, color: "#1a1a1a", margin: 0 }}>{itinerary.branding?.companyName || "TRAV PLATFORMS"}</h4>
+        <p style={{ fontSize: 10, letterSpacing: "0.3em", color: "#888", fontFamily: "sans-serif", margin: 0 }}>© {new Date().getFullYear()} ALL RIGHTS RESERVED</p>
       </div>
     </div>
   );

@@ -421,6 +421,10 @@ export default function PublicWeblinkPage() {
           return itineraryBranding.primaryColor
         case 'companyName':
           return itineraryBranding.headerText
+        case 'headerImage':
+          return itineraryBranding.headerImage
+        case 'footerImage':
+          return itineraryBranding.footerImage
         default:
           return undefined
       }
@@ -453,7 +457,13 @@ export default function PublicWeblinkPage() {
 
       {/* Premium Sticky Header */}
       <header
-        className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-white/20 transition-all duration-300"
+        className="sticky top-0 z-50 backdrop-blur-xl border-b border-white/20 transition-all duration-300"
+        style={{
+          backgroundImage: getBrandingProp('headerImage') ? `linear-gradient(rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.88)), url(${getBrandingProp('headerImage')})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: getBrandingProp('headerImage') ? 'transparent' : 'rgba(255, 255, 255, 0.7)'
+        }}
       >
         {/* Gradient Top Border */}
         <div
@@ -599,12 +609,22 @@ export default function PublicWeblinkPage() {
 
       {/* Footer - Premium Design with Social Media */}
       {shareData.settings.showContactInfo && (getBrandingProp('companyName') || getBrandingProp('contactEmail') || getBrandingProp('contactPhone')) && (
-        <footer className="relative mt-16 bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 text-white overflow-hidden">
+        <footer 
+          className="relative mt-16 text-white overflow-hidden"
+          style={{
+            backgroundImage: getBrandingProp('footerImage') ? `linear-gradient(rgba(17, 24, 39, 0.15), rgba(17, 24, 39, 0.15)), url(${getBrandingProp('footerImage')})` : 'linear-gradient(to bottom right, #111827, #0f172a, #111827)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            textShadow: getBrandingProp('footerImage') ? "0 2px 4px rgba(0,0,0,0.5)" : "none"
+          }}
+        >
           {/* Decorative Background Elements */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl"></div>
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl"></div>
-          </div>
+          {!getBrandingProp('footerImage') && (
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl"></div>
+              <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500 rounded-full filter blur-3xl"></div>
+            </div>
+          )}
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
             <div className="grid md:grid-cols-2 gap-8 mb-8">

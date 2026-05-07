@@ -1,6 +1,7 @@
 "use client"
 
-import { Car, Hotel, Camera, Utensils, PlaneTakeoff, MapPin, Clock } from "lucide-react"
+import { Car, Hotel, Camera, Utensils, PlaneTakeoff, MapPin, Clock, Globe, Phone, Mail } from "lucide-react"
+import { useState, useEffect } from "react"
 
 interface PrebuiltRendererProps {
   element: any
@@ -19,6 +20,22 @@ export function PrebuiltRenderer({
   onDelete,
   onDuplicate
 }: PrebuiltRendererProps) {
+  const [branding, setBranding] = useState<any>(null)
+
+  useEffect(() => {
+    const fetchBranding = async () => {
+      try {
+        const res = await fetch("/api/settings")
+        if (res.ok) {
+          const data = await res.json()
+          setBranding(data.branding)
+        }
+      } catch (error) {
+        console.error("Failed to fetch branding for renderer", error)
+      }
+    }
+    fetchBranding()
+  }, [])
   
   const getIcon = (iconType: string) => {
     switch (iconType) {
@@ -33,6 +50,50 @@ export function PrebuiltRenderer({
 
   const renderElement = () => {
     switch (element.type) {
+      case 'brand-header':
+        return (
+          <div className="w-full h-full bg-white border-b border-gray-100 rounded-t-lg overflow-hidden">
+            {branding?.headerImage && (
+              <div className="w-full">
+                <img src={branding.headerImage} alt="Header Banner" className="w-full h-auto object-cover max-h-[80px]" />
+              </div>
+            )}
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-4">
+                {branding?.logo ? (
+                  <img src={branding.logo} alt="Logo" className="h-12 w-auto object-contain" />
+                ) : (
+                  <div className="h-12 w-12 bg-slate-100 rounded flex items-center justify-center">
+                    <Globe className="h-6 w-6 text-slate-400" />
+                  </div>
+                )}
+                <div>
+                  <h2 className="font-bold text-lg text-slate-900 leading-tight">
+                    {branding?.companyName || "Your Company Name"}
+                  </h2>
+                  <p className="text-xs text-slate-500 italic">
+                    {branding?.address || "Company Address"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 text-[10px] text-slate-400 font-medium">
+                {branding?.contactPhone && (
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    <span>{branding.contactPhone}</span>
+                  </div>
+                )}
+                {branding?.contactEmail && (
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    <span>{branding.contactEmail}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+
       case 'day-header':
         return (
           <div className="bg-yellow-400 text-white rounded-lg p-3 flex items-center justify-between">

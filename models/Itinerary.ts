@@ -60,6 +60,7 @@ export interface IItinerary {
   quotationLead?: any // Store lead data associated with quotation
   // NEW: Overview events for customized packages
   overviewEvents?: IItineraryEvent[] // Overview notes that appear above Day 1
+  fixedScheduleEvents?: IItineraryEvent[] // Fixed schedule events that appear below Overview
   // Service Slots for Additional Information
   serviceSlots?: Array<{
     id: string
@@ -271,6 +272,7 @@ export interface IItineraryEvent {
   | "note"
   | "ancillaries"
   | "cruise"
+  | "fixed-schedule"
   title: string
   description: string
   time?: string
@@ -300,6 +302,8 @@ export interface IItineraryEvent {
   hotelRating?: number
   mealPlan?: string // BLD format (Breakfast, Lunch, Dinner)
   hotelNotes?: string
+  manualDate?: string // For Fixed Schedule
+  manualDepartureCity?: string // For Fixed Schedule
   adults?: number
   children?: number
   propertyType?: string
@@ -410,6 +414,8 @@ export interface IItineraryEvent {
   nights?: number
   images?: string[]
   subtitle?: string
+  originalPrice?: number
+  offeredPrice?: number
   additionalInfoSections?: {
     heading: string
     content: string
@@ -442,6 +448,7 @@ export const ItineraryEventSchema = new mongoose.Schema({
       "list",
       "image",
       "note",
+      "fixed-schedule",
     ],
     required: true,
   },
@@ -482,6 +489,8 @@ export const ItineraryEventSchema = new mongoose.Schema({
   imageAlt: String,
   listItems: [String],
   subtitle: String,
+  originalPrice: Number,
+  offeredPrice: Number,
   // Transfer fields
   fromLocation: String,
   toLocation: String,
@@ -520,6 +529,8 @@ export const ItineraryEventSchema = new mongoose.Schema({
   hotelRating: Number,
   mealPlan: String,
   hotelNotes: String,
+  manualDate: String,
+  manualDepartureCity: String,
   adults: Number,
   children: Number,
   propertyType: String,
@@ -827,6 +838,7 @@ const ItinerarySchema = new mongoose.Schema(
     quotationLead: mongoose.Schema.Types.Mixed,
     // Overview events
     overviewEvents: [ItineraryEventSchema],
+    fixedScheduleEvents: [ItineraryEventSchema],
     // Service Slots for Additional Information
     serviceSlots: [
       {

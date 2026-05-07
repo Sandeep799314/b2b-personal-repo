@@ -9,6 +9,7 @@ interface CreateShareRequest {
   description?: string
   shareType: "individual" | "collection"
   itineraryId?: string
+  productId?: string
   itineraryIds?: string[]
   expiresAt?: string
   expiryMessage?: string
@@ -210,6 +211,7 @@ export async function POST(request: NextRequest) {
       title: body.title,
       description: body.description,
       shareType: body.shareType,
+      productId: body.productId,
       createdBy: "current-user", // TODO: Get from authentication
       isActive: true,
       passwordProtected: body.passwordProtected || false,

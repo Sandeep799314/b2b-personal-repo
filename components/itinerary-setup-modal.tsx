@@ -340,6 +340,25 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 									placeholder="Enter product reference code"
 								/>
 							</div>
+
+							<div>
+								<Label>Destination *</Label>
+								<Input
+									value={formData.destination}
+									onChange={(e) => handleInputChange("destination", e.target.value)}
+									placeholder="Enter primary destination"
+								/>
+							</div>
+
+							<div>
+								<Label>Description</Label>
+								<Textarea
+									value={formData.description}
+									onChange={(e) => handleInputChange("description", e.target.value)}
+									placeholder="Enter itinerary description"
+									rows={3}
+								/>
+							</div>
 						</div>
 
 						{itineraryType === "fixed-group-tour" && (

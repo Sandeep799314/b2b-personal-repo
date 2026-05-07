@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
 import { recalculateQuotationTotals } from "@/lib/pricing-utils"
+import { verifyAuth } from "@/lib/server-auth"
 
 // Helper to capture a full snapshot of the quotation state
 const snapshotQuotationState = (q: any) => {
@@ -32,7 +33,8 @@ const snapshotQuotationState = (q: any) => {
     overviewEvents: q.overviewEvents || [],
     notes: q.notes || "",
     productId: q.productId || "",
-    productReferenceCode: q.productReferenceCode || ""
+    productReferenceCode: q.productReferenceCode || "",
+    queryStatus: q.queryStatus || "pending"
   }
 }
 
@@ -72,6 +74,12 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+
     // Connect to database
     await connectDB()
 
@@ -215,6 +223,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+
     // Connect to database
     await connectDB()
 

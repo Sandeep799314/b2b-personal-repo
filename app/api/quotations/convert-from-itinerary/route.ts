@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       await userDoc.save();
     }
 
-    const CONVERT_CREDIT_COST = 1;
+    const CONVERT_CREDIT_COST = 3;
     if (userDoc.credits < CONVERT_CREDIT_COST) {
       return NextResponse.json({ 
         error: "Insufficient Credits", 
