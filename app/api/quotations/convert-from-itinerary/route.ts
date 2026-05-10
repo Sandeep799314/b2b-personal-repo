@@ -4,36 +4,45 @@ import Itinerary from "@/models/Itinerary"
 import Quotation from "@/models/Quotation"
 import User from "@/models/User"
 import { verifyAuth } from "@/lib/server-auth"
+import { generateQuotationNumber } from "@/lib/utils"
 
 // Helper to capture a full snapshot of the quotation state
 const snapshotQuotationState = (q: any) => {
+  // Convert to plain object if it's a Mongoose document
+  const doc = q.toObject ? q.toObject() : q;
+  
   return {
-    days: q.days || [],
-    pricingOptions: q.pricingOptions || {},
-    subtotal: q.subtotal || 0,
-    markup: q.markup || 0,
-    total: q.total || 0,
-    currencySettings: q.currencySettings || {},
-    title: q.title || "",
-    description: q.description || "",
-    countries: q.countries || [],
-    destination: q.destination || "",
-    duration: q.duration || "",
-    totalPrice: q.totalPrice || 0,
-    currency: q.currency || "USD",
-    type: q.type || "customized-package",
-    cartItems: q.cartItems || [],
-    htmlContent: q.htmlContent || "",
-    htmlBlocks: q.htmlBlocks || [],
-    serviceSlots: q.serviceSlots || [],
-    branding: q.branding || {},
-    gallery: q.gallery || [],
-    highlights: q.highlights || [],
-    images: q.images || [],
-    overviewEvents: q.overviewEvents || [],
-    notes: q.notes || "",
-    productId: q.productId || "",
-    productReferenceCode: q.productReferenceCode || ""
+    days: doc.days || [],
+    pricingOptions: doc.pricingOptions || {},
+    subtotal: doc.subtotal || 0,
+    markup: doc.markup || 0,
+    total: doc.total || 0,
+    currencySettings: doc.currencySettings || {},
+    title: doc.title || "",
+    description: doc.description || "",
+    countries: doc.countries || [],
+    destination: doc.destination || "",
+    duration: doc.duration || "",
+    totalPrice: doc.totalPrice || 0,
+    currency: doc.currency || "USD",
+    type: doc.type || "customized-package",
+    cartItems: doc.cartItems || [],
+    htmlContent: doc.htmlContent || "",
+    htmlBlocks: doc.htmlBlocks || [],
+    serviceSlots: doc.serviceSlots || [],
+    branding: doc.branding || {},
+    gallery: doc.gallery || [],
+    highlights: doc.highlights || [],
+    images: doc.images || [],
+    overviewEvents: doc.overviewEvents || [],
+    fixedScheduleEvents: doc.fixedScheduleEvents || [],
+    guestDetails: doc.guestDetails || {},
+    agencyDetails: doc.agencyDetails || {},
+    headerFooter: doc.headerFooter || {},
+    notes: doc.notes || "",
+    productId: doc.productId || "",
+    productReferenceCode: doc.productReferenceCode || "",
+    queryStatus: doc.queryStatus || "pending"
   }
 }
 
@@ -133,6 +142,7 @@ export async function POST(request: NextRequest) {
       createdByUser: user.displayName || user.email,
       // Itinerary data (DEEP CLONED - not by reference)
       itineraryId: itinerary._id,
+      quotationNumber: generateQuotationNumber(),
       productId: itineraryData.productId,
       productReferenceCode: itineraryData.productReferenceCode,
       title: itineraryData.title,

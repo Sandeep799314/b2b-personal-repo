@@ -10,19 +10,8 @@ export async function GET(request: NextRequest) {
     // Verify authentication
     const user = await verifyAuth(request);
     
-    // Build query - Filter by userId or return collections with no userId (public/legacy)
-    const query = user ? { 
-      $or: [
-        { userId: user.uid },
-        { userId: { $exists: false } },
-        { userId: null }
-      ]
-    } : {
-      $or: [
-        { userId: { $exists: false } },
-        { userId: null }
-      ]
-    }
+    // Build query - Filter by userId only
+    const query = user ? { userId: user.uid } : { _id: null };
 
     const collections = await LibraryCollection.find(query).sort({ createdAt: -1 })
     return NextResponse.json(collections)
@@ -51,11 +40,7 @@ export async function POST(request: NextRequest) {
 
     const existing = await LibraryCollection.findOne({ 
       name: { $regex: new RegExp(`^${name}$`, "i") },
-      $or: [
-        { userId: user.uid },
-        { userId: { $exists: false } },
-        { userId: null }
-      ]
+      userId: user.uid
     })
     
     if (existing) {

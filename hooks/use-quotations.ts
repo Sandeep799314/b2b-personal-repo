@@ -25,13 +25,14 @@ export interface QuotationClientInfo {
 export interface QuotationData {
   _id?: string
   itineraryId: string
+  quotationNumber?: string
   title: string
   description: string
   destination: string
   totalPrice: number
   currency: string
   status: "draft" | "sent" | "accepted" | "rejected" | "expired"
-  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback"
+  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback" | "confirmed"
   pricingOptions: QuotationPricingOptions
   client: QuotationClientInfo
   generatedDate: Date

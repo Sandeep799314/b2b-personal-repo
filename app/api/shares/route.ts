@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb"
 import PublicShare, { IPublicShare } from "@/models/PublicShare"
 import Itinerary from "@/models/Itinerary"
 import { v4 as uuidv4 } from "uuid"
+import { verifyAuth } from "@/lib/server-auth"
 
 interface CreateShareRequest {
   title: string
@@ -60,22 +61,21 @@ interface CreateShareRequest {
 // GET /api/shares - List user's shares
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectToDatabase()
 
     const { searchParams } = new URL(request.url)
-    const createdBy = searchParams.get("createdBy")
     const shareType = searchParams.get("shareType")
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "10")
 
-    if (!createdBy) {
-      return NextResponse.json(
-        { error: "Missing createdBy parameter" },
-        { status: 400 }
-      )
-    }
-
-    const query: any = { createdBy }
+    // Use authenticated user.uid instead of query param
+    const query: any = { createdBy: user.uid }
     if (shareType) {
       query.shareType = shareType
     }
@@ -129,6 +129,12 @@ export async function GET(request: NextRequest) {
 // POST /api/shares - Create new share
 export async function POST(request: NextRequest) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectToDatabase()
 
     const body: CreateShareRequest = await request.json()
@@ -157,25 +163,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify itineraries exist
-    let itineraryVerification
+    // Verify itineraries exist AND user owns them
     if (shareType === "individual") {
-      itineraryVerification = await Itinerary.findById(body.itineraryId)
-      if (!itineraryVerification) {
-        return NextResponse.json(
-          { error: "Itinerary not found" },
-          { status: 404 }
-        )
+      const it = await Itinerary.findById(body.itineraryId)
+      if (!it) {
+        return NextResponse.json({ error: "Itinerary not found" }, { status: 404 })
+      }
+      if (it.userId !== user.uid) {
+        return NextResponse.json({ error: "Unauthorized - You do not own this itinerary" }, { status: 403 })
       }
     } else {
-      itineraryVerification = await Itinerary.find({
-        _id: { $in: body.itineraryIds }
-      })
-      if (itineraryVerification.length !== body.itineraryIds!.length) {
-        return NextResponse.json(
-          { error: "One or more itineraries not found" },
-          { status: 404 }
-        )
+      const its = await Itinerary.find({ _id: { $in: body.itineraryIds } })
+      if (its.length !== body.itineraryIds!.length) {
+        return NextResponse.json({ error: "One or more itineraries not found" }, { status: 404 })
+      }
+      const allOwned = its.every(it => it.userId === user.uid)
+      if (!allOwned) {
+        return NextResponse.json({ error: "Unauthorized - You do not own all selected itineraries" }, { status: 403 })
       }
     }
 
@@ -212,7 +216,7 @@ export async function POST(request: NextRequest) {
       description: body.description,
       shareType: body.shareType,
       productId: body.productId,
-      createdBy: "current-user", // TODO: Get from authentication
+      createdBy: user.uid, // Correctly set from auth
       isActive: true,
       passwordProtected: body.passwordProtected || false,
       password: hashedPassword,
@@ -247,12 +251,8 @@ export async function POST(request: NextRequest) {
       shareData.itineraryIds = body.itineraryIds
     }
 
-    console.log('[API POST] Social media BEFORE save:', JSON.stringify(shareData.settings?.customBranding, null, 2))
-
     const newShare = new PublicShare(shareData)
     await newShare.save()
-
-    console.log('[API POST] Social media AFTER save:', JSON.stringify(newShare.settings?.customBranding, null, 2))
 
     // Populate the response
     await newShare.populate([

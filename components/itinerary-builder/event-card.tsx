@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { IItineraryEvent } from "@/models/Itinerary"
-import { MoreHorizontal, Pencil, Trash, ChevronUp, ChevronDown } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash, ChevronUp, ChevronDown, Copy } from "lucide-react"
 import { HotelEvent } from "./hotel-event"
 import { TransferEvent } from "./transfer-event"
 import { ActivityEvent } from "./activity-event"
@@ -30,6 +30,7 @@ interface EventCardProps {
   onDragEnd?: () => void
   onEdit?: () => void
   onDelete?: () => void
+  onDuplicate?: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
   nightIndex?: number // Current night for multi-night hotels (1, 2, 3, etc.)
@@ -53,6 +54,7 @@ export function EventCard({
   onDragEnd,
   onEdit,
   onDelete,
+  onDuplicate,
   onMoveUp,
   onMoveDown,
   nightIndex,
@@ -277,6 +279,12 @@ export function EventCard({
                 <DropdownMenuItem onClick={onMoveDown}>
                   <ChevronDown className="mr-2 h-4 w-4" />
                   Move Down
+                </DropdownMenuItem>
+              )}
+              {onDuplicate && (
+                <DropdownMenuItem onClick={onDuplicate}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Duplicate
                 </DropdownMenuItem>
               )}
               {onDelete && (

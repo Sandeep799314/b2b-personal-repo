@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
+import { verifyAuth } from "@/lib/server-auth"
 
 // Helper to capture a full snapshot of the quotation state
 const snapshotQuotationState = (q: any) => {
@@ -45,6 +46,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Connect to database
     await connectDB()
 
@@ -67,6 +74,11 @@ export async function POST(
     const quotation = await Quotation.findById(id)
     if (!quotation) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    }
+
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
     }
 
     // Check if current version is locked (prevent creating new version from a locked one)

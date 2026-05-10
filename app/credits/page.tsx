@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Script from "next/script";
 import { TopHeader } from "@/components/top-header";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,10 +13,10 @@ import { cn } from "@/lib/utils";
 
 const RECHARGE_PLANS = [
   {
-    id: "basic",
+    id: "starter",
     name: "Starter Pack",
-    credits: 50,
-    price: 499,
+    credits: 100,
+    price: 500,
     description: "Perfect for exploring the platform",
     popular: false,
     color: "bg-blue-50 border-blue-200 text-blue-800"
@@ -23,17 +24,19 @@ const RECHARGE_PLANS = [
   {
     id: "pro",
     name: "Business Pro",
-    credits: 200,
-    price: 1499,
+    credits: 500,
+    price: 2000,
+    oldPrice: 2200,
     description: "Best for active travel agents",
     popular: true,
     color: "bg-brand-primary-50 border-brand-primary-200 text-brand-primary-800"
   },
   {
-    id: "premium",
+    id: "enterprise",
     name: "Enterprise",
     credits: 1000,
-    price: 4999,
+    price: 3200,
+    oldPrice: 3600,
     description: "Maximum value for large teams",
     popular: false,
     color: "bg-purple-50 border-purple-200 text-purple-800"
@@ -62,34 +65,99 @@ export default function CreditsPage() {
     fetchCredits();
   }, []);
 
-  const handleRecharge = async (planId: string, amount: number) => {
-    setIsRecharging(planId);
+  const handleRecharge = async (plan: typeof RECHARGE_PLANS[0]) => {
+    setIsRecharging(plan.id);
     try {
+      // Diagnostic check for Key ID
+      if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
+        console.error("Razorpay Key ID is missing! Please set NEXT_PUBLIC_RAZORPAY_KEY_ID in your environment.");
+        toast({
+          title: "Configuration Error",
+          description: "Payment system is not properly configured. Please check your Razorpay Key ID.",
+          variant: "destructive"
+        });
+        setIsRecharging(null);
+        return;
+      }
+
       const headers = await getAuthHeaders();
-      const res = await fetch("/api/user/credits/recharge", {
+      
+      // 1. Create Order
+      const orderRes = await fetch("/api/credits/razorpay/order", {
         method: "POST",
         headers,
-        body: JSON.stringify({ amount })
+        body: JSON.stringify({ 
+          amount: plan.price,
+          planId: plan.id 
+        })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setCredits(data.newBalance);
-        
-        // Trigger global wallet refresh
-        window.dispatchEvent(new CustomEvent('refresh-credits'));
-        
-        toast({
-          title: "Payment Successful",
-          description: data.message,
-        });
-      } else {
-        throw new Error("Failed to recharge");
+      if (!orderRes.ok) throw new Error("Failed to create order");
+      const orderData = await orderRes.json();
+
+      // 2. Open Razorpay Checkout
+      const options = {
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "TravPlatforms",
+        description: `Purchase ${plan.credits} Credits`,
+        order_id: orderData.id,
+        handler: async function (response: any) {
+          try {
+            // 3. Verify Payment
+            const verifyRes = await fetch("/api/credits/razorpay/verify", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                credits: plan.credits
+              })
+            });
+
+            if (verifyRes.ok) {
+              const verifyData = await verifyRes.json();
+              setCredits(verifyData.newBalance);
+              window.dispatchEvent(new CustomEvent('refresh-credits'));
+              
+              toast({
+                title: "Payment Successful",
+                description: `${plan.credits} credits have been added to your wallet.`,
+              });
+            } else {
+              throw new Error("Payment verification failed");
+            }
+          } catch (err) {
+            toast({
+              title: "Verification Failed",
+              description: "We couldn't verify your payment. Please contact support if amount was deducted.",
+              variant: "destructive"
+            });
+          }
+        },
+        prefill: {
+          name: "",
+          email: "",
+        },
+        theme: {
+          color: "#000000",
+        },
+      };
+
+      if (!(window as any).Razorpay) {
+        throw new Error("Razorpay SDK not loaded");
       }
-    } catch (error) {
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+      
+    } catch (error: any) {
+      console.error("Payment error:", error);
       toast({
-        title: "Payment Failed",
-        description: "Something went wrong with the transaction. Please try again.",
+        title: "Order Failed",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -98,10 +166,14 @@ export default function CreditsPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-neutral-50/30">
+    <div className="min-h-screen flex flex-col bg-neutral-50/30">
+      <Script
+        id="razorpay-checkout-js"
+        src="https://checkout.razorpay.com/v1/checkout.js"
+      />
       <TopHeader showWallet={true} />
       
-      <main className="flex-1 overflow-auto p-6 lg:p-8 max-w-6xl mx-auto w-full space-y-8 animate-fade-in">
+      <main className="flex-1 p-6 lg:p-8 max-w-6xl mx-auto w-full space-y-8 animate-fade-in">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -190,9 +262,14 @@ export default function CreditsPage() {
                     <span className="text-4xl font-black text-neutral-900 leading-none">{plan.credits}</span>
                     <span className="text-xs font-bold text-neutral-400 uppercase tracking-widest mt-1">Credits</span>
                   </div>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-2xl font-bold text-neutral-900">₹{plan.price}</span>
-                    <span className="text-xs font-medium text-neutral-500 italic">one-time</span>
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-neutral-900">₹{plan.price}</span>
+                      <span className="text-xs font-medium text-neutral-500 italic">one-time</span>
+                    </div>
+                    {plan.oldPrice && (
+                      <span className="text-sm text-neutral-400 line-through font-medium">₹{plan.oldPrice}</span>
+                    )}
                   </div>
                 </CardHeader>
                 
@@ -223,7 +300,7 @@ export default function CreditsPage() {
                         ? "bg-brand-primary-500 hover:bg-brand-primary-600 text-white" 
                         : "bg-white border-2 border-neutral-900 text-neutral-900 hover:bg-neutral-900 hover:text-white"
                     )}
-                    onClick={() => handleRecharge(plan.id, plan.credits)}
+                    onClick={() => handleRecharge(plan)}
                     disabled={isRecharging !== null}
                   >
                     {isRecharging === plan.id ? (

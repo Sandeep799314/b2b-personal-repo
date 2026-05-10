@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import User from "@/models/User"
 import { verifyAuth } from "@/lib/server-auth"
+import { generateQuotationNumber } from "@/lib/utils"
 
 // GET /api/quotations
 export async function GET(request: NextRequest) {
@@ -31,9 +32,17 @@ export async function GET(request: NextRequest) {
     const quotations = await Quotation.find(query)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .lean()
 
-    return NextResponse.json(quotations)
+    // Auto-patch missing quotation numbers for legacy records
+    const patchedQuotations = await Promise.all(quotations.map(async (q) => {
+      if (!q.quotationNumber) {
+        q.quotationNumber = generateQuotationNumber();
+        await q.save();
+      }
+      return q;
+    }));
+
+    return NextResponse.json(patchedQuotations)
   } catch (error) {
     console.error("Error fetching quotations:", error)
     return NextResponse.json({ error: "Failed to fetch quotations" }, { status: 500 })
@@ -84,6 +93,7 @@ export async function POST(request: NextRequest) {
       userId: user.uid,
       userEmail: user.email,
       createdByUser: user.displayName || user.email,
+      quotationNumber: generateQuotationNumber(),
     };
 
     // Create new quotation

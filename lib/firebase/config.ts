@@ -10,13 +10,29 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
-if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-} else {
-    app = getApps()[0];
+// Validate config
+const isConfigValid = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
+
+if (!isConfigValid && typeof window !== 'undefined') {
+    console.warn('Firebase configuration is missing. Check your environment variables.');
 }
 
-export const auth: Auth = getAuth(app);
+// Initialize Firebase
+let app: FirebaseApp;
+try {
+    if (!getApps().length) {
+        app = initializeApp(firebaseConfig);
+    } else {
+        app = getApps()[0];
+    }
+} catch (error) {
+    console.error('Error initializing Firebase:', error);
+    // Fallback or rethrow depending on environment
+    if (typeof window !== 'undefined') {
+        throw error;
+    }
+}
+
+// @ts-ignore - app might be undefined if initialization failed
+export const auth: Auth = isConfigValid ? getAuth(app) : null as any;
 export default app;

@@ -25,13 +25,109 @@ import {
   Loader2,
   Settings,
   Percent,
-  Upload
-} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { IPublicShare } from "@/models/PublicShare"
-import { IItinerary } from "@/models/Itinerary"
+  Upload,
+  Globe
+  } from "lucide-react"
+  import { useToast } from "@/hooks/use-toast"
+  import { IPublicShare } from "@/models/PublicShare"
+  import { IItinerary } from "@/models/Itinerary"
 
-interface ShareWithItineraries extends IPublicShare {
+  interface DomainSettingsDialogProps {
+  isOpen: boolean
+  onClose: () => void
+  onSubdomainUpdated: (subdomain: string | null) => void
+  currentSubdomain: string | null
+  }
+
+  function DomainSettingsDialog({ isOpen, onClose, onSubdomainUpdated, currentSubdomain }: DomainSettingsDialogProps) {
+  const [subdomain, setSubdomain] = useState(currentSubdomain || "")
+  const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
+
+  const mainDomain = typeof window !== "undefined" 
+    ? window.location.hostname === "localhost" ? "localhost:3000" : "travplatforms.in"
+    : "travplatforms.in"
+
+  const handleSave = async () => {
+    try {
+      setSaving(true)
+      const response = await fetch("/api/user/subdomain", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subdomain: subdomain.trim() || null })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to update subdomain")
+      }
+
+      onSubdomainUpdated(data.subdomain)
+      toast({
+        title: "Success",
+        description: "Domain settings updated successfully"
+      })
+      onClose()
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update subdomain",
+        variant: "destructive"
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Domain Settings</DialogTitle>
+          <DialogDescription>
+            Configure your custom subdomain for sharing itineraries.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="subdomain">Personal Subdomain</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="subdomain"
+                value={subdomain}
+                onChange={(e) => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                placeholder="your-name"
+                className="flex-1"
+              />
+              <span className="text-gray-500 font-medium">.{mainDomain}</span>
+            </div>
+            <p className="text-xs text-gray-500">
+              Only lowercase letters, numbers, and hyphens allowed.
+            </p>
+          </div>
+
+          {subdomain && (
+            <div className="p-3 bg-blue-50 rounded-md border border-blue-100">
+              <p className="text-xs font-medium text-blue-700 mb-1">Preview URL:</p>
+              <p className="text-sm font-mono text-blue-800 break-all">
+                https://{subdomain}.{mainDomain}/[slug]
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+  }
+
+  interface ShareWithItineraries extends IPublicShare {
   itinerary?: IItinerary
   itineraries?: IItinerary[]
 }
@@ -43,9 +139,10 @@ interface CreateShareModalProps {
   onShareUpdated?: (share: ShareWithItineraries) => void
   availableItineraries: IItinerary[]
   initialShare?: ShareWithItineraries | null
+  userSubdomain: string | null
 }
 
-function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, availableItineraries, initialShare }: CreateShareModalProps) {
+function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, availableItineraries, initialShare, userSubdomain }: CreateShareModalProps) {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -435,6 +532,17 @@ function CreateShareModal({ isOpen, onClose, onShareCreated, onShareUpdated, ava
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Enter share title"
               />
+              {formData.title && (
+                <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Share URL Preview:</p>
+                  <p className="text-sm font-mono text-blue-600 break-all">
+                    {userSubdomain 
+                      ? `https://${userSubdomain}.${typeof window !== "undefined" ? (window.location.hostname === "localhost" ? "localhost:3000" : "travplatforms.in") : "travplatforms.in"}/${formData.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()}`
+                      : `${typeof window !== "undefined" ? window.location.origin : ""}/weblinks/${formData.title.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').trim()}`
+                    }
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -1298,12 +1406,27 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
   const [shares, setShares] = useState<ShareWithItineraries[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showDomainModal, setShowDomainModal] = useState(false)
   const [editingShare, setEditingShare] = useState<ShareWithItineraries | null>(null)
+  const [userSubdomain, setUserSubdomain] = useState<string | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     fetchShares()
+    fetchSubdomain()
   }, [])
+
+  const fetchSubdomain = async () => {
+    try {
+      const response = await fetch("/api/user/subdomain")
+      if (response.ok) {
+        const data = await response.json()
+        setUserSubdomain(data.subdomain)
+      }
+    } catch (error) {
+      console.error("Error fetching subdomain:", error)
+    }
+  }
 
   const fetchShares = async () => {
     try {
@@ -1341,6 +1464,13 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
   // Get share URL (use slug if available, otherwise generate from title)
   const getShareUrl = (share: any) => {
     const slug = share.slug || generateSlug(share.title)
+    if (userSubdomain) {
+      const mainDomain = typeof window !== "undefined" 
+        ? window.location.hostname === "localhost" ? "localhost:3000" : "travplatforms.in"
+        : "travplatforms.in"
+      // Use root path on subdomain: https://sub.domain.com/slug
+      return `https://${userSubdomain}.${mainDomain}/${slug}`
+    }
     return `${window.location.origin}/weblinks/${slug}`
   }
 
@@ -1455,10 +1585,16 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
           <h2 className="text-2xl font-bold">Share Management</h2>
           <p className="text-gray-600">Create and manage public links for your itineraries</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Weblink
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowDomainModal(true)}>
+            <Globe className="h-4 w-4 mr-2" />
+            Domain Settings
+          </Button>
+          <Button onClick={() => setShowCreateModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Weblink
+          </Button>
+        </div>
       </div>
 
       {/* Shares List */}
@@ -1647,6 +1783,15 @@ export default function ShareManagement({ availableItineraries }: ShareManagemen
         }}
         availableItineraries={availableItineraries}
         initialShare={editingShare}
+        userSubdomain={userSubdomain}
+      />
+
+      {/* Domain Settings Modal */}
+      <DomainSettingsDialog
+        isOpen={showDomainModal}
+        onClose={() => setShowDomainModal(false)}
+        currentSubdomain={userSubdomain}
+        onSubdomainUpdated={(subdomain) => setUserSubdomain(subdomain)}
       />
     </div>
   )

@@ -20,12 +20,13 @@ export interface IQuotation extends Omit<IItinerary, "_id" | "status" | "userId"
   userEmail?: string // User's email for reference
   createdByUser?: string // User's display name
   itineraryId: string // Reference to the original itinerary
+  quotationNumber?: string // Base unique number (e.g., ABC12)
   pricingOptions: QuotationPricingOptions
   subtotal?: number // Base price before markup
   markup?: number // Calculated markup amount
   total?: number // Final total after markup
   status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "locked"
-  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback"
+  queryStatus: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback" | "confirmed"
   validUntil?: Date
   client: {
     name: string
@@ -95,6 +96,7 @@ const QuotationSchema = new mongoose.Schema(
     userEmail: { type: String },
     createdByUser: { type: String },
     itineraryId: { type: String, required: true },
+    quotationNumber: { type: String, unique: true, sparse: true },
     productId: { type: String },
     title: { type: String },
     description: { type: String },
@@ -110,12 +112,12 @@ const QuotationSchema = new mongoose.Schema(
     },
     queryStatus: {
       type: String,
-      enum: ["pending", "completed", "closed", "cancelled", "awaiting_feedback"],
+      enum: ["pending", "completed", "closed", "cancelled", "awaiting_feedback", "confirmed"],
       default: "pending",
     },
     type: {
       type: String,
-      enum: ["fixed-group-tour", "customized-package", "cart-combo", "html-editor"],
+      enum: ["fixed-group-tour", "customized-package", "cart-combo", "html-editor", "fully-editor"],
       default: "customized-package",
     },
     createdBy: { type: String },
@@ -337,7 +339,6 @@ const QuotationSchema = new mongoose.Schema(
 
         // Extended Ancillaries Fields
         visaCountry: String,
-        entryMethod: String,
         departureDate: String,
         returnDate: String,
         baseCurrency: String,
@@ -483,6 +484,8 @@ const QuotationSchema = new mongoose.Schema(
         headerFooter: { type: mongoose.Schema.Types.Mixed },
         notes: { type: String },
         productId: { type: String },
+        productReferenceCode: { type: String },
+        queryStatus: { type: String },
       },
     }],
     currentVersion: { type: Number, default: 1 },

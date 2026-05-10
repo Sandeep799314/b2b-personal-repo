@@ -33,10 +33,8 @@ const BrandingSettingsSchema = new mongoose.Schema({
 })
 
 const SettingsSchema = new mongoose.Schema({
-    // Use a fixed ID or userId for singleton 'global' settings 
-    // For now, we assume one global settings document or per-user if auth was present.
-    // Using a distinct field to find it easily.
-    type: { type: String, default: "global", unique: true },
+    // Store settings per user
+    userId: { type: String, required: true, unique: true, index: true },
 
     currency: { type: CurrencySettingsSchema, default: () => ({}) },
     branding: { type: BrandingSettingsSchema },

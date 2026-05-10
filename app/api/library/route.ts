@@ -13,15 +13,10 @@ export async function GET(request: NextRequest) {
     // Verify authentication
     const user = await verifyAuth(request);
     
-    // Build query: User's items OR items with no userId OR global items
-    const query = { 
-      $or: [
-        { isGlobal: true },
-        ...(user ? [{ userId: user.uid }] : []),
-        { userId: { $exists: false } },
-        { userId: null }
-      ]
-    }
+    // Build query: User's items OR global items
+    const query = user 
+      ? { $or: [{ userId: user.uid }, { isGlobal: true }] }
+      : { isGlobal: true };
 
     const itemsNeedingFix = await LibraryItem.find({ libraryCollection: { $type: 'string' } })
     const fixes = []

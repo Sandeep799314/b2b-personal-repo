@@ -1,18 +1,25 @@
-
 import { type NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
 import { Settings } from "@/models/Settings"
+import { verifyAuth } from "@/lib/server-auth"
 
 export async function GET(request: NextRequest) {
     try {
-        await connectToDatabase()
-        // Find standard global settings doc
-        let settings = await Settings.findOne({ type: "global" })
+        // Verify authentication
+        const user = await verifyAuth(request);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
-        // If not exists, return defaults (or empty object, frontend handles defaults)
+        await connectToDatabase()
+        
+        // Find settings for the specific user
+        let settings = await Settings.findOne({ userId: user.uid })
+
+        // If not exists, return defaults
         if (!settings) {
             settings = {
-                type: "global",
+                userId: user.uid,
                 currency: { baseCurrency: "INR", rates: {}, isManual: false },
                 branding: {},
                 companies: []
@@ -31,14 +38,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        // Verify authentication
+        const user = await verifyAuth(request);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         await connectToDatabase()
         const data = await request.json()
 
-        // Upsert global settings
+        // Upsert settings for this user
         const settings = await Settings.findOneAndUpdate(
-            { type: "global" },
+            { userId: user.uid },
             {
                 $set: {
+                    userId: user.uid,
                     currency: data.currency,
                     branding: data.branding,
                     companies: data.companies

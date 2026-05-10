@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react"
 import { ItineraryBuilder } from "@/components/itinerary-builder"
 import { CartComboBuilder } from "@/components/cart-combo-builder"
 import { HtmlEditorBuilder } from "@/components/html-editor-builder"
+import { FullyEditorBuilder } from "@/components/fully-editor-builder"
 import { FixedGroupTourBuilder } from "@/components/fixed-group-tour-builder"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
@@ -137,6 +138,13 @@ function ItineraryBuilderContent() {
         return (
           <div className="flex-1 flex flex-col">
             <HtmlEditorBuilder itineraryId={itineraryId || undefined} onBack={handleBack} />
+          </div>
+        )
+
+      case 'fully-editor':
+        return (
+          <div className="flex-1 flex flex-col">
+            <FullyEditorBuilder itineraryId={itineraryId || undefined} onBack={handleBack} />
           </div>
         )
 

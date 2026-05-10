@@ -7,34 +7,41 @@ import { verifyAuth } from "@/lib/server-auth"
 
 // Helper to capture a full snapshot of the quotation state
 const snapshotQuotationState = (q: any) => {
+  // Convert to plain object if it's a Mongoose document
+  const doc = q.toObject ? q.toObject() : q;
+  
   return {
-    days: q.days || [],
-    pricingOptions: q.pricingOptions || {},
-    subtotal: q.subtotal || 0,
-    markup: q.markup || 0,
-    total: q.total || 0,
-    currencySettings: q.currencySettings || {},
-    title: q.title || "",
-    description: q.description || "",
-    countries: q.countries || [],
-    destination: q.destination || "",
-    duration: q.duration || "",
-    totalPrice: q.totalPrice || 0,
-    currency: q.currency || "USD",
-    type: q.type || "customized-package",
-    cartItems: q.cartItems || [],
-    htmlContent: q.htmlContent || "",
-    htmlBlocks: q.htmlBlocks || [],
-    serviceSlots: q.serviceSlots || [],
-    branding: q.branding || {},
-    gallery: q.gallery || [],
-    highlights: q.highlights || [],
-    images: q.images || [],
-    overviewEvents: q.overviewEvents || [],
-    notes: q.notes || "",
-    productId: q.productId || "",
-    productReferenceCode: q.productReferenceCode || "",
-    queryStatus: q.queryStatus || "pending"
+    days: doc.days || [],
+    pricingOptions: doc.pricingOptions || {},
+    subtotal: doc.subtotal || 0,
+    markup: doc.markup || 0,
+    total: doc.total || 0,
+    currencySettings: doc.currencySettings || {},
+    title: doc.title || "",
+    description: doc.description || "",
+    countries: doc.countries || [],
+    destination: doc.destination || "",
+    duration: doc.duration || "",
+    totalPrice: doc.totalPrice || 0,
+    currency: doc.currency || "USD",
+    type: doc.type || "customized-package",
+    cartItems: doc.cartItems || [],
+    htmlContent: doc.htmlContent || "",
+    htmlBlocks: doc.htmlBlocks || [],
+    serviceSlots: doc.serviceSlots || [],
+    branding: doc.branding || {},
+    gallery: doc.gallery || [],
+    highlights: doc.highlights || [],
+    images: doc.images || [],
+    overviewEvents: doc.overviewEvents || [],
+    fixedScheduleEvents: doc.fixedScheduleEvents || [],
+    guestDetails: doc.guestDetails || {},
+    agencyDetails: doc.agencyDetails || {},
+    headerFooter: doc.headerFooter || {},
+    notes: doc.notes || "",
+    productId: doc.productId || "",
+    productReferenceCode: doc.productReferenceCode || "",
+    queryStatus: doc.queryStatus || "pending"
   }
 }
 
@@ -44,6 +51,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Connect to database
     await connectDB()
 
@@ -59,6 +72,11 @@ export async function GET(
 
     if (!quotation) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    }
+
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
     }
 
     return NextResponse.json(quotation)
@@ -98,6 +116,11 @@ export async function PUT(
     const quotation = await Quotation.findById(id)
     if (!quotation) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    }
+
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
     }
 
     // Update pricing options if provided
@@ -206,6 +229,11 @@ export async function PUT(
 
     quotation.set(updateData)
 
+    // Update the state of the current version to reflect these changes if it's not locked
+    if (quotation.versionHistory[versionIndex] && !quotation.versionHistory[versionIndex].isLocked) {
+      quotation.versionHistory[versionIndex].state = snapshotQuotationState(quotation)
+    }
+
     quotation.markModified("versionHistory")
 
     const updatedQuotation = await quotation.save()
@@ -240,11 +268,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid quotation ID format" }, { status: 400 })
     }
 
-    const quotation = await Quotation.findByIdAndDelete(id)
-
+    const quotation = await Quotation.findById(id)
     if (!quotation) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
+
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
+    }
+
+    await Quotation.findByIdAndDelete(id)
 
     return NextResponse.json({ message: "Quotation deleted successfully" })
   } catch (error) {

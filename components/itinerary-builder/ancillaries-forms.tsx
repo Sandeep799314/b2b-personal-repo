@@ -5,26 +5,33 @@ import { Textarea } from "@/components/ui/textarea"
 
 interface AncillariesFormsProps {
     selectedSubCategory: string
+    ancillariesSubCategories?: { id: string; label: string; icon: string }[]
     // Common fields
     manualTitle: string
     setManualTitle: (value: string) => void
+    manualDescription?: string
+    setManualDescription?: (value: string) => void
     manualPrice: number | ""
     setManualPrice: (value: number | "") => void
     manualCurrency: string
     setManualCurrency: (value: string) => void
+    manualImageUrl?: string
+    setManualImageUrl?: (value: string) => void
 
     // Visa specific
-    manualCountry: string
-    setManualCountry: (value: string) => void
+    manualCountry?: string
+    setManualCountry?: (value: string) => void
+    manualVisaCountry?: string
+    setManualVisaCountry?: (value: string) => void
     manualVisaType: string
     setManualVisaType: (value: string) => void
     manualVisaDuration: string
     setManualVisaDuration: (value: string) => void
-    manualServiceFee: number | ""
-    setManualServiceFee: (value: number | "") => void
-    manualTotalFee: number | ""
-    manualLengthOfStay: string
-    setManualLengthOfStay: (value: string) => void
+    manualServiceFee?: number | ""
+    setManualServiceFee?: (value: number | "") => void
+    manualTotalFee?: number | ""
+    manualLengthOfStay?: string
+    setManualLengthOfStay?: (value: string) => void
     manualEntryMethod: string
     setManualEntryMethod: (value: string) => void
     manualDepartureDate: string
@@ -39,6 +46,8 @@ interface AncillariesFormsProps {
     setManualBaseCurrency: (value: string) => void
     manualAmount: number | ""
     setManualAmount: (value: number | "") => void
+    manualExchangeRate?: string
+    setManualExchangeRate?: (value: string) => void
 
     // Travel Insurance specific
     manualDestinations: string[]
@@ -53,23 +62,44 @@ interface AncillariesFormsProps {
     setManualNoOfTravellers: (value: number | "") => void
     manualInsuranceType: string
     setManualInsuranceType: (value: string) => void
+    manualInsuranceProvider?: string
+    setManualInsuranceProvider?: (value: string) => void
+    manualPolicyNumber?: string
+    setManualPolicyNumber?: (value: string) => void
+    manualCoverageDetails?: string
+    setManualCoverageDetails?: (value: string) => void
     manualNotes: string
     setManualNotes: (value: string) => void
     manualSumInsured: number | ""
     setManualSumInsured: (value: number | "") => void
+
+    // SIM Card specific
+    manualSimProvider?: string
+    setManualSimProvider?: (value: string) => void
+    manualDataLimit?: string
+    setManualDataLimit?: (value: string) => void
+    manualValidity?: string
+    setManualValidity?: (value: string) => void
 }
 
 export function AncillariesForms(props: AncillariesFormsProps) {
     const {
         selectedSubCategory,
+        ancillariesSubCategories,
         manualTitle,
         setManualTitle,
+        manualDescription,
+        setManualDescription,
         manualPrice,
         setManualPrice,
         manualCurrency,
         setManualCurrency,
+        manualImageUrl,
+        setManualImageUrl,
         manualCountry,
         setManualCountry,
+        manualVisaCountry,
+        setManualVisaCountry,
         manualVisaType,
         setManualVisaType,
         manualVisaDuration,
@@ -91,6 +121,8 @@ export function AncillariesForms(props: AncillariesFormsProps) {
         setManualBaseCurrency,
         manualAmount,
         setManualAmount,
+        manualExchangeRate,
+        setManualExchangeRate,
         manualDestinations,
         handleAddDestination,
         handleRemoveDestination,
@@ -103,10 +135,22 @@ export function AncillariesForms(props: AncillariesFormsProps) {
         setManualNoOfTravellers,
         manualInsuranceType,
         setManualInsuranceType,
+        manualInsuranceProvider,
+        setManualInsuranceProvider,
+        manualPolicyNumber,
+        setManualPolicyNumber,
+        manualCoverageDetails,
+        setManualCoverageDetails,
         manualNotes,
         setManualNotes,
         manualSumInsured,
         setManualSumInsured,
+        manualSimProvider,
+        setManualSimProvider,
+        manualDataLimit,
+        setManualDataLimit,
+        manualValidity,
+        setManualValidity,
     } = props
 
     return (

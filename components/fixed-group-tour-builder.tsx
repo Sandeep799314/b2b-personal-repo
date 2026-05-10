@@ -28,14 +28,30 @@ import { getAuthHeaders } from "@/lib/client-auth"
 
 interface FixedGroupTourBuilderProps {
   itineraryId?: string
+  quotationId?: string
+  mode?: "itinerary" | "quotation"
   onBack: () => void
+  onSave?: (data?: any) => Promise<void>
   onHasChangesChange?: (hasChanges: boolean) => void
+  readOnly?: boolean
+  initialTitle?: string
+  initialDescription?: string
 }
 
-export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange }: FixedGroupTourBuilderProps) {
+export function FixedGroupTourBuilder({ 
+  itineraryId, 
+  quotationId,
+  mode = "itinerary",
+  onBack, 
+  onSave,
+  onHasChangesChange,
+  readOnly = false,
+  initialTitle,
+  initialDescription
+}: FixedGroupTourBuilderProps) {
   const { toast } = useToast()
-  const [title, setTitle] = useState("New Fixed Group Tour")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle || "New Fixed Group Tour")
+  const [description, setDescription] = useState(initialDescription || "")
   const [productId, setProductId] = useState(`FGT-${Date.now().toString(36).toUpperCase()}`)
   const [destination, setDestination] = useState("")
   const [duration, setDuration] = useState("")
@@ -58,6 +74,19 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
   const isInitialLoad = useRef(true)
+
+  // Sync state when initial props change
+  useEffect(() => {
+    if (initialTitle !== undefined) {
+      setTitle(initialTitle || "")
+    }
+  }, [initialTitle])
+
+  useEffect(() => {
+    if (initialDescription !== undefined) {
+      setDescription(initialDescription || "")
+    }
+  }, [initialDescription])
 
   // Load existing data if editing
   useEffect(() => {
@@ -231,6 +260,14 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
         gallery,
       }
 
+      if (mode === "quotation" && onSave) {
+        await onSave(itineraryData);
+        setIsSaving(false);
+        setShowSaved(true);
+        setTimeout(() => setShowSaved(false), 2000);
+        return;
+      }
+
       const url = itineraryId ? `/api/itineraries/${itineraryId}` : "/api/itineraries"
       const method = itineraryId ? "PUT" : "POST"
 
@@ -245,18 +282,22 @@ export function FixedGroupTourBuilder({ itineraryId, onBack, onHasChangesChange 
       })
 
       if (response.ok) {
-        const savedData = await response.json()
+        const result = await response.json();
         toast({
           title: "Success",
           description: `Fixed Group Tour ${itineraryId ? "updated" : "created"} successfully`,
         })
+        
+        if (onSave) {
+          await onSave({
+            ...itineraryData,
+            itineraryId: result._id
+          });
+        }
+        
         setHasChanges(false)
         setShowSaved(true)
         setTimeout(() => setShowSaved(false), 2000)
-        // Update itineraryId for future saves
-        if (!itineraryId && savedData._id) {
-          // Could update URL or handle navigation here
-        }
       } else {
         throw new Error("Failed to save")
       }

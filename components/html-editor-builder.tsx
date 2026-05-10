@@ -38,7 +38,14 @@ import type { IGalleryItem } from "@/models/Itinerary"
 
 interface HtmlEditorBuilderProps {
   itineraryId?: string
+  quotationId?: string
+  mode?: "itinerary" | "quotation"
   onBack: () => void
+  onSave?: (data?: any) => Promise<void>
+  readOnly?: boolean
+  initialHtmlBlocks?: IHtmlBlock[]
+  initialTitle?: string
+  initialDescription?: string
 }
 
 const BLOCK_TYPES = [
@@ -51,15 +58,25 @@ const BLOCK_TYPES = [
   { type: "table", label: "Table", icon: Table, description: "Add a simple table" },
 ] as const
 
-export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProps) {
+export function HtmlEditorBuilder({ 
+  itineraryId, 
+  quotationId,
+  mode = "itinerary",
+  onBack, 
+  onSave,
+  readOnly = false,
+  initialHtmlBlocks,
+  initialTitle,
+  initialDescription
+}: HtmlEditorBuilderProps) {
   const { toast } = useToast()
-  const [title, setTitle] = useState("New HTML Itinerary")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle || "New HTML Itinerary")
+  const [description, setDescription] = useState(initialDescription || "")
   const [productId, setProductId] = useState(`HTM-${Date.now().toString(36).toUpperCase()}`)
-  const [htmlBlocks, setHtmlBlocks] = useState<IHtmlBlock[]>([])
+  const [htmlBlocks, setHtmlBlocks] = useState<IHtmlBlock[]>(initialHtmlBlocks || [])
   const [showAddBlockForm, setShowAddBlockForm] = useState(false)
   const [editingBlock, setEditingBlock] = useState<IHtmlBlock | null>(null)
-  const [previewMode, setPreviewMode] = useState(false)
+  const [previewMode, setPreviewMode] = useState(readOnly)
   const [isSaving, setIsSaving] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
   const [blockForm, setBlockForm] = useState({
@@ -75,14 +92,36 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
   // Gallery state
   const [gallery, setGallery] = useState<IGalleryItem[]>([])
 
+  // Sync state when initial props change
+  useEffect(() => {
+    if (initialTitle !== undefined) {
+      setTitle(initialTitle || "")
+    }
+  }, [initialTitle])
+
+  useEffect(() => {
+    if (initialDescription !== undefined) {
+      setDescription(initialDescription || "")
+    }
+  }, [initialDescription])
+
+  useEffect(() => {
+    if (initialHtmlBlocks && initialHtmlBlocks.length > 0) {
+      setHtmlBlocks(initialHtmlBlocks)
+    }
+  }, [initialHtmlBlocks])
+
   // Load existing HTML data if editing
   useEffect(() => {
-    if (itineraryId) {
-      loadHtmlData()
-    } else {
-      initializeFromParams()
+    if (initialHtmlBlocks && initialHtmlBlocks.length > 0) {
+      setHtmlBlocks(initialHtmlBlocks)
+      return;
     }
-  }, [itineraryId])
+
+    if (mode === "itinerary" && itineraryId) {
+      loadHtmlData()
+    }
+  }, [itineraryId, mode, initialHtmlBlocks])
 
   const loadHtmlData = async () => {
     try {
@@ -244,6 +283,7 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
   const handleSave = async () => {
     setIsSaving(true)
     try {
+      const sortedBlocks = [...htmlBlocks].sort((a, b) => a.order - b.order);
       const itineraryData = {
         productId,
         title,
@@ -253,7 +293,6 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
         duration: "Variable",
         totalPrice: 0,
         currency: "USD",
-
         createdBy: "agent-user",
         lastUpdatedBy: "agent-user",
         countries: [],
@@ -261,8 +300,16 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
         highlights: [],
         images: [],
         gallery,
-        htmlBlocks: htmlBlocks.sort((a, b) => a.order - b.order),
+        htmlBlocks: sortedBlocks,
         htmlContent: generateHtmlContent(),
+      }
+
+      if (mode === "quotation" && onSave) {
+        await onSave(itineraryData);
+        setIsSaving(false);
+        setShowSaved(true);
+        setTimeout(() => setShowSaved(false), 2000);
+        return;
       }
 
       const url = itineraryId ? `/api/itineraries/${itineraryId}` : "/api/itineraries"
@@ -279,10 +326,19 @@ export function HtmlEditorBuilder({ itineraryId, onBack }: HtmlEditorBuilderProp
       })
 
       if (response.ok) {
+        const result = await response.json();
         toast({
           title: "Success",
           description: `HTML Itinerary ${itineraryId ? "updated" : "created"} successfully`,
         })
+
+        if (onSave) {
+          await onSave({
+            ...itineraryData,
+            itineraryId: result._id
+          });
+        }
+
         setShowSaved(true)
         setTimeout(() => setShowSaved(false), 2000)
       } else {

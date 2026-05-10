@@ -1448,4 +1448,3 @@ function CollectionView({
     </div>
   )
 }
-}

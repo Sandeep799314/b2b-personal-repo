@@ -33,6 +33,10 @@ import {
 } from "@/components/ui/select"
 
 import { ItineraryBuilder } from "@/components/itinerary-builder"
+import { FullyEditorBuilder } from "@/components/fully-editor-builder"
+import { CartComboBuilder } from "@/components/cart-combo-builder"
+import { FixedGroupTourBuilder } from "@/components/fixed-group-tour-builder"
+import { HtmlEditorBuilder } from "@/components/html-editor-builder"
 import { QuotationStatusStepper } from "@/components/quotation-status-stepper"
 import { UserWallet } from "@/components/user-wallet"
 import { Badge } from "@/components/ui/badge"
@@ -633,158 +637,300 @@ export function QuotationDetail({ id }: { id: string }) {
         <main className="flex-1 overflow-hidden flex flex-col">
           {quotation && (
             <>
-              <div className="px-6 pt-4 pb-2 bg-white border-b flex items-center justify-between no-print">
+              <div className="px-6 py-4 bg-white border-b flex items-center justify-between no-print">
                 <div className="flex items-center gap-4">
                   <Button variant="ghost" size="sm" onClick={() => router.push('/quotation-builder')}>
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back
                   </Button>
                   <div className="h-6 w-px bg-neutral-200" />
-                <div className="flex items-center gap-6 flex-1">
-                    <h1 className="text-xl font-bold truncate max-w-[200px] lg:max-w-[400px]" title={quotation.title}>
-                      {quotation.title}
-                    </h1>
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-neutral-500 whitespace-nowrap">Version:</span>
-                        <Select value={selectedVersion?.toString()} onValueChange={handleVersionChange}>
-                          <SelectTrigger className="h-7 w-[100px] text-xs">
-                            <SelectValue placeholder="Select version" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {quotation.versionHistory?.map((v) => (
-                              <SelectItem key={v.versionNumber} value={v.versionNumber.toString()}>
-                                V{v.versionNumber} {v.versionNumber === quotation.currentVersion ? '(Current)' : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {isReadOnly && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Read Only</Badge>}
-                      </div>
-                        {isReadOnly ? (
-                          <div className="flex items-center gap-2 ml-auto">
-                            <Button
-                              onClick={handleExtractVersion}
-                              variant="outline"
-                              className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm transition-all duration-300 px-6 h-9 font-bold"
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              Extract to Draft
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                // Logic for sharing
-                                toast({
-                                  title: "Share Quotation",
-                                  description: "Sharing functionality triggered for locked version.",
-                                });
-                                // If there is a specific share link or modal, trigger it here
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all duration-300 px-6 h-9 font-bold"
-                            >
-                              <Send className="mr-2 h-4 w-4" />
-                              Share Quote
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button 
-                            onClick={() => {
-                              if (selectedVersion) {
-                                handleLockVersion(selectedVersion.toString());
+                  {!isReadOnly && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase">Format:</span>
+                      <Select 
+                        value={currentType || "customized-package"} 
+                        onValueChange={async (val) => {
+                          if (quotation) {
+                            try {
+                              console.log("[DEBUG] Changing quotation format to:", val);
+                              const updated = await updateQuotation(quotation._id!, { type: val as any });
+                              if (updated) {
+                                console.log("[DEBUG] Quotation format updated successfully:", updated.type);
+                                syncQuotationState(updated);
                               }
-                            }}
-                            className="bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all duration-300 px-6 h-9 font-bold ml-auto"
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Finalise Quote
-                          </Button>
-                        )}
+                            } catch (error) {
+                              console.error("Error updating type:", error);
+                              toast({
+                                title: "Error",
+                                description: "Failed to update format",
+                                variant: "destructive"
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-40 text-xs">
+                          <SelectValue placeholder="Format" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="customized-package">Standard (Customized)</SelectItem>
+                          <SelectItem value="fixed-group-tour">Fixed Group Tour</SelectItem>
+                          <SelectItem value="fully-editor">Fully Editor (Free-form)</SelectItem>
+                          <SelectItem value="cart-combo">Cart Combo</SelectItem>
+                          <SelectItem value="html-editor">HTML Editor</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
+                  )}
+                  <div className="h-6 w-px bg-neutral-200" />
+                  <div className="flex items-center gap-4">
+                    <h1 className="text-xl font-bold text-neutral-900">V{selectedVersion}</h1>
+                    <Select value={selectedVersion?.toString()} onValueChange={handleVersionChange}>
+                      <SelectTrigger className="h-8 w-auto px-3 flex items-center gap-2 bg-neutral-50 border-neutral-200 hover:bg-neutral-100 transition-colors rounded-md text-xs font-medium text-neutral-600">
+                        <span>History</span>
+                      </SelectTrigger>
+                      <SelectContent align="start">
+                        {quotation.versionHistory?.map((v) => (
+                          <SelectItem key={v.versionNumber} value={v.versionNumber.toString()}>
+                            V{v.versionNumber} {v.versionNumber === quotation.currentVersion ? '(Current)' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isReadOnly && <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200">Read Only</Badge>}
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!isReadOnly && (
+                    <Button 
+                      onClick={() => {
+                        if (selectedVersion) {
+                          handleLockVersion(selectedVersion.toString());
+                        }
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-white shadow-md transition-all duration-300 px-6 h-9 text-xs font-bold rounded-xl"
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Finalise Quote
+                    </Button>
+                  )}
+                  {isReadOnly && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleExtractVersion}
+                        variant="outline"
+                        className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm transition-all duration-300 px-6 h-9 font-bold"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Extract to Draft
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          toast({
+                            title: "Share Quotation",
+                            description: "Sharing functionality triggered for locked version.",
+                          });
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all duration-300 px-6 h-9 font-bold"
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        Share Quote
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <ItineraryBuilder
-                  itineraryId={quotation.itineraryId}
-                  quotationId={quotation._id}
-                  mode="quotation"
-                  readOnly={isReadOnly}
-                  initialDays={currentDays}
-                  initialPricingOptions={currentPricing}
-                  initialTitle={currentTitle}
-                  initialDescription={currentDescription}
-                  initialCountries={currentCountries}
-                  initialProductReferenceCode={currentProductReferenceCode}
-                  initialBranding={currentBranding}
-                  initialGallery={currentGallery}
-                  initialOverviewEvents={currentOverviewEvents}
-                  initialServiceSlots={currentServiceSlots}
-                  initialNotes={currentNotes}
-                  initialHighlights={currentHighlights}
-                  initialImages={currentImages}
-                  initialType={currentType}
-                  initialCartItems={currentCartItems}
-                  initialHtmlContent={currentHtmlContent}
-                  initialHtmlBlocks={currentHtmlBlocks}
-                  initialFixedScheduleEvents={currentFixedScheduleEvents}
-                  initialGuestDetails={currentGuestDetails}
-                  initialAgencyDetails={currentAgencyDetails}
-                  initialHeaderFooter={currentHeaderFooter}
-                  hideWallet={true}
-                  onBack={() => router.push('/quotation-builder')}
-                  onSave={async (data?: any) => {
-                    console.log('[QUOTATION SAVE] onSave triggered with data:', data);
-
-                    if (data && data.quotationOptions && data.days) {
-                      try {
-                        // Construct a temporary quotation to recalculate totals
-                        const tempQuotation = {
-                          ...quotation,
-                          ...data,
-                          pricingOptions: data.quotationOptions
-                        };
-
-                        const recalculated = recalculateTotals(tempQuotation);
-
-                        // Construct the payload with ALL fields from data
-                        const payload = {
-                          ...data,
-                          pricingOptions: recalculated.pricingOptions,
-                          subtotal: recalculated.subtotal,
-                          markup: recalculated.markup,
-                          total: recalculated.total,
-                          client: quotation.client,
-                          currencySettings: quotation.currencySettings,
-                          notes: data.notes || quotation.notes,
-                          title: data.title || quotation.title,
-                          description: data.description || quotation.description,
-                          validUntil: quotation.validUntil,
-                          totalPrice: recalculated.price || recalculated.total
-                        };
-
-                        const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
-                        syncQuotationState(updatedQuotation);
-
-                        toast({
-                          title: "Success",
-                          description: "New version created successfully"
-                        });
-                      } catch (error) {
-                        console.error('[QUOTATION SAVE] Error during save:', error);
-                        toast({
-                          title: "Error",
-                          description: error instanceof Error ? error.message : "Failed to save quotation",
-                          variant: "destructive"
-                        });
+                {currentType === "fully-editor" ? (
+                  <FullyEditorBuilder
+                    itineraryId={quotation.itineraryId}
+                    quotationId={quotation._id}
+                    mode="quotation"
+                    readOnly={isReadOnly}
+                    onBack={() => router.push('/quotation-builder')}
+                    initialHtmlBlocks={currentHtmlBlocks}
+                    initialTitle={currentTitle}
+                    initialDescription={currentDescription}
+                    onSave={async (data?: any) => {
+                      if (data) {
+                        try {
+                          const payload = {
+                            ...data,
+                            client: quotation.client,
+                            currencySettings: quotation.currencySettings,
+                          };
+                          const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                          syncQuotationState(updatedQuotation);
+                          toast({ title: "Success", description: "Version saved" });
+                        } catch (error) {
+                          console.error('Error saving fully editor:', error);
+                          toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+                        }
                       }
-                    }
-                  }}
-                  extraActions={
-                    <Button variant="outline" size="icon" onClick={() => setIsVersionHistoryOpen(true)} title="Version History">
-                      <History className="h-4 w-4" />
-                    </Button>
-                  }
-                />
+                    }}
+                  />
+                ) : currentType === "cart-combo" ? (
+                  <CartComboBuilder
+                    itineraryId={quotation.itineraryId}
+                    quotationId={quotation._id}
+                    mode="quotation"
+                    readOnly={isReadOnly}
+                    onBack={() => router.push('/quotation-builder')}
+                    initialCartItems={currentCartItems}
+                    initialTitle={currentTitle}
+                    initialDescription={currentDescription}
+                    onSave={async (data?: any) => {
+                      if (data) {
+                        try {
+                          const payload = {
+                            ...data,
+                            client: quotation.client,
+                            currencySettings: quotation.currencySettings,
+                          };
+                          const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                          syncQuotationState(updatedQuotation);
+                          toast({ title: "Success", description: "Version saved" });
+                        } catch (error) {
+                          console.error('Error saving cart combo:', error);
+                          toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+                        }
+                      }
+                    }}
+                  />
+                ) : currentType === "fixed-group-tour" ? (
+                  <FixedGroupTourBuilder
+                    itineraryId={quotation.itineraryId}
+                    quotationId={quotation._id}
+                    mode="quotation"
+                    readOnly={isReadOnly}
+                    onBack={() => router.push('/quotation-builder')}
+                    initialTitle={currentTitle}
+                    initialDescription={currentDescription}
+                    onSave={async (data?: any) => {
+                      if (data) {
+                        try {
+                          const payload = {
+                            ...data,
+                            client: quotation.client,
+                            currencySettings: quotation.currencySettings,
+                          };
+                          const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                          syncQuotationState(updatedQuotation);
+                          toast({ title: "Success", description: "Version saved" });
+                        } catch (error) {
+                          console.error('Error saving fixed group tour:', error);
+                          toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+                        }
+                      }
+                    }}
+                  />
+                ) : currentType === "html-editor" ? (
+                  <HtmlEditorBuilder
+                    itineraryId={quotation.itineraryId}
+                    quotationId={quotation._id}
+                    mode="quotation"
+                    readOnly={isReadOnly}
+                    onBack={() => router.push('/quotation-builder')}
+                    initialHtmlBlocks={currentHtmlBlocks}
+                    initialTitle={currentTitle}
+                    initialDescription={currentDescription}
+                    onSave={async (data?: any) => {
+                      if (data) {
+                        try {
+                          const payload = {
+                            ...data,
+                            client: quotation.client,
+                            currencySettings: quotation.currencySettings,
+                          };
+                          const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                          syncQuotationState(updatedQuotation);
+                          toast({ title: "Success", description: "Version saved" });
+                        } catch (error) {
+                          console.error('Error saving html editor:', error);
+                          toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+                        }
+                      }
+                    }}
+                  />
+                ) : (
+                  <ItineraryBuilder
+                    itineraryId={quotation.itineraryId}
+                    quotationId={quotation._id}
+                    mode="quotation"
+                    readOnly={isReadOnly}
+                    initialDays={currentDays}
+                    initialPricingOptions={currentPricing}
+                    initialTitle={currentTitle}
+                    initialDescription={currentDescription}
+                    initialCountries={currentCountries}
+                    initialProductReferenceCode={currentProductReferenceCode}
+                    initialBranding={currentBranding}
+                    initialGallery={currentGallery}
+                    initialOverviewEvents={currentOverviewEvents}
+                    initialServiceSlots={currentServiceSlots}
+                    initialNotes={currentNotes}
+                    initialHighlights={currentHighlights}
+                    initialImages={currentImages}
+                    initialType={currentType}
+                    initialCartItems={currentCartItems}
+                    initialHtmlContent={currentHtmlContent}
+                    initialHtmlBlocks={currentHtmlBlocks}
+                    initialFixedScheduleEvents={currentFixedScheduleEvents}
+                    initialGuestDetails={currentGuestDetails}
+                    initialAgencyDetails={currentAgencyDetails}
+                    initialHeaderFooter={currentHeaderFooter}
+                    hideWallet={true}
+                    onBack={() => router.push('/quotation-builder')}
+                    onSave={async (data?: any) => {
+                      console.log('[QUOTATION SAVE] onSave triggered with data:', data);
+
+                      if (data && data.quotationOptions && data.days) {
+                        try {
+                          // Construct a temporary quotation to recalculate totals
+                          const tempQuotation = {
+                            ...quotation,
+                            ...data,
+                            pricingOptions: data.quotationOptions
+                          };
+
+                          const recalculated = recalculateTotals(tempQuotation);
+
+                          // Construct the payload with ALL fields from data
+                          const payload = {
+                            ...data,
+                            pricingOptions: recalculated.pricingOptions,
+                            subtotal: recalculated.subtotal,
+                            markup: recalculated.markup,
+                            total: recalculated.total,
+                            client: quotation.client,
+                            currencySettings: quotation.currencySettings,
+                            notes: data.notes || quotation.notes,
+                            title: data.title || quotation.title,
+                            description: data.description || quotation.description,
+                            validUntil: quotation.validUntil,
+                            totalPrice: recalculated.price || recalculated.total
+                          };
+
+                          const updatedQuotation = await saveQuotationVersion(quotation._id!, payload);
+                          syncQuotationState(updatedQuotation);
+
+                          toast({
+                            title: "Success",
+                            description: "New version created successfully"
+                          });
+                        } catch (error) {
+                          console.error('[QUOTATION SAVE] Error during save:', error);
+                          toast({
+                            title: "Error",
+                            description: error instanceof Error ? error.message : "Failed to save quotation",
+                            variant: "destructive"
+                          });
+                        }
+                      }
+                    }}
+                  />
+                )}
               </div>
               <Dialog open={isVersionHistoryOpen} onOpenChange={setIsVersionHistoryOpen}>
                 <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">

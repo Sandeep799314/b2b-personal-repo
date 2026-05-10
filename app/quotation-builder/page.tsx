@@ -58,6 +58,7 @@ import {
   MapPin,
   Tag,
   History,
+  Lock,
   ArrowUpDown,
   ArrowUpNarrowWide,
   ArrowDownNarrowWide,
@@ -86,10 +87,11 @@ const StatusBadge = ({ status }: { status: string }) => {
     locked: "bg-indigo-50 text-indigo-600 border-indigo-200",
   }
 
-  const label = status === 'draft' ? 'Open' : status;
+  const label = status === 'draft' ? 'Draft' : status;
 
   return (
-    <Badge variant="outline" className={`${variants[status] || variants.draft} font-medium px-2 h-5 flex items-center text-[10px] uppercase rounded border`}>
+    <Badge variant="outline" className={`${variants[status] || variants.draft} font-medium px-2 h-5 flex items-center gap-1 text-[10px] uppercase rounded border`}>
+      {status === 'locked' && <Lock className="h-2.5 w-2.5" />}
       {label}
     </Badge>
   )
@@ -102,17 +104,18 @@ const QueryStatusBadge = ({
   onUpdate
 }: { 
   quotationId: string, 
-  status: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback",
+  status: "pending" | "completed" | "closed" | "cancelled" | "awaiting_feedback" | "confirmed",
   onUpdate: (id: string, data: any) => Promise<any>
 }) => {
   const [isUpdating, setIsUpdating] = useState(false)
 
   const configs = {
-    pending: { label: "Open", color: "bg-white text-slate-600 border-slate-200", icon: Clock },
-    awaiting_feedback: { label: "Feedback", color: "bg-amber-50/50 text-amber-600 border-amber-200", icon: History },
+    pending: { label: "Open", color: "bg-amber-100/50 text-amber-700 border-amber-200", icon: Clock },
+    awaiting_feedback: { label: "Feedback", color: "bg-pink-50 text-pink-600 border-pink-200", icon: History },
+    confirmed: { label: "Trip Confirmed", color: "bg-blue-50 text-blue-600 border-blue-200", icon: CheckCircle2 },
     completed: { label: "Completed", color: "bg-emerald-50/50 text-emerald-600 border-emerald-200", icon: CheckCircle2 },
     closed: { label: "Closed", color: "bg-rose-50/50 text-rose-600 border-rose-200", icon: XCircle },
-    cancelled: { label: "Cancelled", color: "bg-slate-50 text-slate-500 border-slate-200", icon: XCircle },
+    cancelled: { label: "Cancelled", color: "bg-purple-50 text-purple-600 border-purple-200", icon: XCircle },
   }
 
   const current = configs[status] || configs.pending
@@ -142,13 +145,17 @@ const QueryStatusBadge = ({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48 p-1">
-        <DropdownMenuItem onClick={() => handleStatusChange("pending")} className="gap-2.5 py-2 cursor-pointer text-slate-600">
-          <Clock className="h-4 w-4 text-slate-400" />
+        <DropdownMenuItem onClick={() => handleStatusChange("pending")} className="gap-2.5 py-2 cursor-pointer text-amber-700">
+          <Clock className="h-4 w-4 text-amber-500" />
           <span className="text-sm">Set to Open</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleStatusChange("awaiting_feedback")} className="gap-2.5 py-2 cursor-pointer text-amber-600">
-          <History className="h-4 w-4 text-amber-500" />
+        <DropdownMenuItem onClick={() => handleStatusChange("awaiting_feedback")} className="gap-2.5 py-2 cursor-pointer text-pink-600">
+          <History className="h-4 w-4 text-pink-500" />
           <span className="text-sm">Awaiting Feedback</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleStatusChange("confirmed")} className="gap-2.5 py-2 cursor-pointer text-blue-600">
+          <CheckCircle2 className="h-4 w-4 text-blue-500" />
+          <span className="text-sm">Trip Confirmed</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => handleStatusChange("completed")} className="gap-2.5 py-2 cursor-pointer text-emerald-600">
           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -158,8 +165,8 @@ const QueryStatusBadge = ({
           <XCircle className="h-4 w-4 text-rose-500" />
           <span className="text-sm">Mark Closed</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleStatusChange("cancelled")} className="gap-2.5 py-2 cursor-pointer text-slate-600">
-          <XCircle className="h-4 w-4 text-slate-400" />
+        <DropdownMenuItem onClick={() => handleStatusChange("cancelled")} className="gap-2.5 py-2 cursor-pointer text-purple-600">
+          <XCircle className="h-4 w-4 text-purple-400" />
           <span className="text-sm">Mark Cancelled</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -419,82 +426,93 @@ export default function QuotationBuilderPage() {
                     <Table className="table-fixed w-full">
                       <TableHeader className="bg-slate-50/50">
                         <TableRow className="hover:bg-transparent border-b border-slate-200 h-auto">
-                          <TableHead className="w-[50px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5">Q.No</TableHead>
+                          <TableHead className="w-[40px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5">Q.No</TableHead>
                           <TableHead 
-                            onClick={() => handleSort('title')}
-                            className="w-[180px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            onClick={() => handleSort('quotationNumber')}
+                            className="w-[100px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
-                            <div className="flex items-center">Quotation {getSortIcon('title')}</div>
-                          </TableHead>
-                          <TableHead 
-                            onClick={() => handleSort('status')}
-                            className="w-[100px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
-                          >
-                            <div className="flex items-center">Version {getSortIcon('status')}</div>
+                            <div className="flex items-center">Quotation ID {getSortIcon('quotationNumber')}</div>
                           </TableHead>
                           <TableHead 
                             onClick={() => handleSort('clientName')}
-                            className="w-[140px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            className="w-[120px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
                             <div className="flex items-center">Client Name {getSortIcon('clientName')}</div>
                           </TableHead>
                           <TableHead 
+                            onClick={() => handleSort('status')}
+                            className="w-[90px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
+                          >
+                            <div className="flex items-center">Version {getSortIcon('status')}</div>
+                          </TableHead>
+                          <TableHead 
+                            onClick={() => handleSort('title')}
+                            className="w-[160px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
+                          >
+                            <div className="flex items-center">Quotation {getSortIcon('title')}</div>
+                          </TableHead>
+                          <TableHead 
                             onClick={() => handleSort('createdAt')}
-                            className="w-[140px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            className="w-[110px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
                             <div className="flex items-center">Created {getSortIcon('createdAt')}</div>
                           </TableHead>
                           <TableHead 
                             onClick={() => handleSort('updatedAt')}
-                            className="w-[140px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            className="w-[110px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
-                            <div className="flex items-center">Modified {getSortIcon('updatedAt')}</div>
+                            <div className="flex items-center">Last Modified {getSortIcon('updatedAt')}</div>
                           </TableHead>
                           <TableHead 
                             onClick={() => handleSort('amount')}
-                            className="w-[140px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            className="w-[100px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
                             <div className="flex items-center">Amount {getSortIcon('amount')}</div>
                           </TableHead>
                           <TableHead 
                             onClick={() => handleSort('queryStatus')}
-                            className="w-[140px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5 cursor-pointer group"
+                            className="w-[110px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5 cursor-pointer group"
                           >
                             <div className="flex items-center">Query Status {getSortIcon('queryStatus')}</div>
                           </TableHead>
-                          <TableHead className="w-[120px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-wider py-3 px-4 align-top h-auto leading-5">Actions</TableHead>
+                          <TableHead className="w-[100px] font-bold text-slate-800 text-left uppercase text-[10px] tracking-tight py-3 px-2 align-top h-auto leading-5">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sortedAndFilteredQuotations.map((quotation, index) => (
                           <React.Fragment key={quotation._id}>
                             <TableRow className="group hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
-                              <TableCell className="text-left align-top py-3 px-4">
+                              <TableCell className="text-left align-top py-3 px-2">
                                 <span className="text-slate-400 text-sm font-semibold leading-5">{index + 1}</span>
                               </TableCell>
-                              <TableCell className="align-top py-3 px-4">
-                                <div className="flex flex-col items-start gap-1 leading-5">
-                                  <span className="font-bold text-slate-900 text-sm leading-tight truncate max-w-[180px]" title={quotation.title}>
-                                    {quotation.title}
-                                  </span>
-                                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium leading-none">
-                                    <MapPin className="h-3 w-3 text-slate-400" />
-                                    <span>{quotation.destination}</span>
-                                  </div>
-                                </div>
+                              <TableCell className="align-top py-3 px-2 text-left">
+                                <span className="font-bold text-brand-primary-700 text-sm leading-5 font-mono">
+                                  {quotation.quotationNumber || 'NEW'}-{quotation.currentVersion || 1}
+                                </span>
                               </TableCell>
-                              <TableCell className="align-top py-3 text-left px-4">
+                              <TableCell className="align-top py-3 px-2 text-left">
+                                <span className="font-semibold text-slate-700 text-sm leading-5 truncate block">
+                                  {quotation.client?.name || 'Unspecified'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="align-top py-3 text-left px-2">
                                 <div className="flex items-start justify-start gap-1 leading-none mt-0.5">
                                   <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">V{quotation.currentVersion || 1}</span>
                                   <StatusBadge status={quotation.status} />
                                 </div>
                               </TableCell>
-                              <TableCell className="align-top py-3 px-4 text-left">
-                                <span className="font-semibold text-slate-700 text-sm leading-5 truncate max-w-[130px]">
-                                  {quotation.client?.name || 'Unspecified'}
-                                </span>
+                              <TableCell className="align-top py-3 px-2">
+                                <div className="flex flex-col items-start gap-1 leading-5">
+                                  <span className="font-bold text-slate-900 text-sm leading-tight truncate block w-full" title={quotation.title}>
+                                    {quotation.title}
+                                  </span>
+                                  <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium leading-none">
+                                    <MapPin className="h-3 w-3 text-slate-400" />
+                                    <span className="truncate">{quotation.destination}</span>
+                                  </div>
+                                </div>
                               </TableCell>
-                              <TableCell className="align-top py-3 text-left px-4">
+                              <TableCell className="align-top py-3 text-left px-2">
                                 <div className="flex flex-col items-start leading-5 gap-0.5">
                                   <span className="text-sm text-slate-600 font-semibold leading-none whitespace-nowrap">
                                     {quotation.createdAt ? formatDate(quotation.createdAt) : '-'}
@@ -504,7 +522,7 @@ export default function QuotationBuilderPage() {
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="align-top py-3 text-left px-4">
+                              <TableCell className="align-top py-3 text-left px-2">
                                 <div className="flex flex-col items-start leading-5 gap-0.5">
                                   <span className="text-sm text-slate-600 font-semibold leading-none whitespace-nowrap">
                                     {quotation.updatedAt ? formatDate(quotation.updatedAt) : '-'}
@@ -514,7 +532,7 @@ export default function QuotationBuilderPage() {
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="align-top py-3 text-left px-4">
+                              <TableCell className="align-top py-3 text-left px-2">
                                 <span className="font-bold text-slate-900 text-sm leading-5 tracking-tight">
                                   {formatCurrency(
                                     quotation.pricingOptions?.finalTotalPrice || quotation.totalPrice,
@@ -522,7 +540,7 @@ export default function QuotationBuilderPage() {
                                   )}
                                 </span>
                               </TableCell>
-                              <TableCell className="align-top py-3 text-left px-4">
+                              <TableCell className="align-top py-3 text-left px-2">
                                 <div className="leading-none flex justify-start items-start">
                                   <QueryStatusBadge 
                                     quotationId={quotation._id!} 
@@ -531,7 +549,7 @@ export default function QuotationBuilderPage() {
                                   />
                                 </div>
                               </TableCell>
-                              <TableCell className="text-left align-top py-3 px-4">
+                              <TableCell className="text-left align-top py-3 px-2">
                                 <div className="flex flex-col items-start">
                                   <div className="flex items-start justify-start gap-1 leading-none">
                                     <Button
@@ -618,6 +636,25 @@ export default function QuotationBuilderPage() {
                                   <TableCell className="text-left align-top py-3 px-4 opacity-30">
                                     <span className="text-slate-400 text-sm font-semibold leading-5">{index + 1}</span>
                                   </TableCell>
+                                  <TableCell className="align-top py-3 px-4 text-left">
+                                    <span className="font-bold text-slate-400 text-sm leading-5 font-mono opacity-60">
+                                      {quotation.quotationNumber || 'OLD'}-{ver.versionNumber}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="align-top py-3 px-4 text-left">
+                                    <span className="font-medium text-slate-400 text-sm leading-5 truncate max-w-[130px]">
+                                      {quotation.client?.name || 'Unspecified'}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="align-top py-3 text-left px-4">
+                                    <div className="flex items-start justify-start gap-1 leading-none mt-0.5">
+                                      <span className="text-[10px] font-bold text-slate-300 bg-slate-50 px-1.5 py-0.5 rounded">V{ver.versionNumber}</span>
+                                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 opacity-40 border-slate-200 uppercase font-bold text-slate-400 leading-none flex items-center gap-1">
+                                        <Lock className="h-2 w-2" />
+                                        LOCKED
+                                      </Badge>
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="align-top py-3 px-4">
                                     <div className="flex flex-col items-start gap-1 leading-5">
                                       <span className="font-semibold text-slate-500 text-sm leading-tight truncate max-w-[180px]">
@@ -628,19 +665,6 @@ export default function QuotationBuilderPage() {
                                         <span>{quotation.destination}</span>
                                       </div>
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="align-top py-3 text-left px-4">
-                                    <div className="flex items-start justify-start gap-1 leading-none mt-0.5">
-                                      <span className="text-[10px] font-bold text-slate-300 bg-slate-50 px-1.5 py-0.5 rounded">V{ver.versionNumber}</span>
-                                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 opacity-40 border-slate-200 uppercase font-bold text-slate-400 leading-none">
-                                        LOCKED
-                                      </Badge>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="align-top py-3 px-4 text-left">
-                                    <span className="font-medium text-slate-400 text-sm leading-5 truncate max-w-[130px]">
-                                      {quotation.client?.name || 'Unspecified'}
-                                    </span>
                                   </TableCell>
                                   <TableCell className="align-top py-3 text-left px-4">
                                     <div className="flex flex-col items-start leading-5 gap-0.5">
@@ -664,6 +688,11 @@ export default function QuotationBuilderPage() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="align-top py-3 text-left px-4">
+                                    <span className="font-semibold text-slate-400 text-sm leading-5 tracking-tight opacity-70">
+                                      {formatCurrency(ver.state?.totalPrice || ver.totalPrice || quotation.totalPrice, quotation.currency)}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="align-top py-3 text-left px-4">
                                     <div className="leading-none flex justify-start items-start opacity-30 pointer-events-none">
                                       <QueryStatusBadge 
                                         quotationId={quotation._id!} 
@@ -671,11 +700,6 @@ export default function QuotationBuilderPage() {
                                         onUpdate={updateQuotation}
                                       />
                                     </div>
-                                  </TableCell>
-                                  <TableCell className="align-top py-3 text-left px-4">
-                                    <span className="font-semibold text-slate-400 text-sm leading-5 tracking-tight opacity-70">
-                                      {formatCurrency(ver.state?.totalPrice || ver.totalPrice || quotation.totalPrice, quotation.currency)}
-                                    </span>
                                   </TableCell>
                                   <TableCell className="text-left align-top py-3 px-4">
                                     <div className="flex items-start justify-start gap-1 leading-none">

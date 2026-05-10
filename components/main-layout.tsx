@@ -27,12 +27,10 @@ export function MainLayout({ children }: MainLayoutProps) {
         }
     }, [shouldStartCollapsed])
 
-    const isWeblinkPage = pathname.startsWith('/weblinks')
     const isEditorPage = pathname.includes("/builder") || pathname.includes("/preview") || pathname.includes("/editor")
     
-    // Hide header on weblinks always. 
-    // Show header on all other pages including editor pages in both mobile and desktop.
-    const showGlobalHeader = !isWeblinkPage
+    // Show header on all pages.
+    const showGlobalHeader = true
 
     return (
         <div className="flex min-h-screen bg-gray-50/50">
@@ -55,7 +53,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     "flex-1 transition-all duration-300 min-h-screen w-full",
                     // Only apply margins on desktop
                     collapsed ? "lg:ml-16" : "lg:ml-64",
-                    (showGlobalHeader || (!isEditorPage && !isWeblinkPage)) && "pt-12"
+                    showGlobalHeader && "pt-12"
                 )}
             >
                 {children}

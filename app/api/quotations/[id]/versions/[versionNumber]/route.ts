@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
+import { verifyAuth } from "@/lib/server-auth"
 
 // PUT /api/quotations/[id]/versions/[versionNumber]
 export async function PUT(
@@ -9,6 +10,12 @@ export async function PUT(
     { params }: { params: Promise<{ id: string; versionNumber: string }> }
 ) {
     try {
+        // Verify authentication
+        const user = await verifyAuth(request);
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
         // Connect to database
         await connectDB()
 
@@ -31,6 +38,11 @@ export async function PUT(
             return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
         }
 
+        // Check ownership
+        if (quotation.userId !== user.uid) {
+            return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
+        }
+
         // Find the specified version in history
         const versionData = quotation.versionHistory?.find(
             (v: any) => v.versionNumber === parsedVersionNumber
@@ -48,7 +60,8 @@ export async function PUT(
                 "destination", "duration", "totalPrice", "currency", "type",
                 "cartItems", "htmlContent", "htmlBlocks", "serviceSlots",
                 "branding", "gallery", "highlights", "images", "overviewEvents",
-                "notes", "productId", "productReferenceCode"
+                "fixedScheduleEvents", "guestDetails", "agencyDetails", "headerFooter",
+                "notes", "productId", "productReferenceCode", "queryStatus"
             ];
 
             fieldsToRestore.forEach(field => {

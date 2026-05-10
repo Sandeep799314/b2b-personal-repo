@@ -3,6 +3,7 @@ import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import Itinerary from "@/models/Itinerary"
 import { isValidObjectId } from "mongoose"
+import { verifyAuth } from "@/lib/server-auth"
 
 const calculateOriginalTotal = (itinerary: any) => {
   let totalFromDays = 0
@@ -41,6 +42,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectDB()
 
     const { id } = await params
@@ -53,6 +60,11 @@ export async function POST(
 
     if (!quotation) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
+    }
+
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
     }
 
     if (!quotation.itineraryId || !isValidObjectId(quotation.itineraryId)) {

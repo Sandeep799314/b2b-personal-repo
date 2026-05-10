@@ -18,7 +18,7 @@ export interface IItinerary {
   markupType?: "percentage" | "amount"
   markupValue?: number
   status?: "published" | "archived" | "draft"
-  type: "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor" // NEW: Itinerary types
+  type: "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor" | "fully-editor" // NEW: Itinerary types
   createdBy: string
   lastUpdatedBy?: string // NEW: Track who last updated
   createdAt: Date
@@ -220,7 +220,6 @@ export interface ICartItem {
 
   // Ancillaries extended
   visaCountry?: string
-  entryMethod?: string
   departureDate?: string
   returnDate?: string
   baseCurrency?: string
@@ -229,16 +228,39 @@ export interface ICartItem {
   coverageDetails?: string
 }
 
+export interface IGalleryBlockItem {
+  url: string
+  width?: string
+  height?: string
+  order: number
+}
+
 // NEW: HTML Block interface for HTML editor
 export interface IHtmlBlock {
   id: string
-  type: "heading" | "paragraph" | "list" | "image" | "divider" | "quote" | "table"
+  type: "heading" | "paragraph" | "list" | "image" | "divider" | "quote" | "table" | "gallery"
   content: string
   level?: number // For headings (h1, h2, h3, etc.)
   listType?: "ordered" | "unordered" // For lists
   items?: string[] // For list items
+  galleryItems?: IGalleryBlockItem[] // For gallery block
+  tableData?: string[][] // For table block (rows of cells)
   imageUrl?: string
+  videoUrl?: string // For video block
   imageCaption?: string
+  calloutType?: "info" | "warning" | "success" | "error" // For callout block
+  bold?: boolean
+  italic?: boolean
+  underline?: boolean
+  align?: "left" | "center" | "right" | "justify"
+  float?: "none" | "left" | "right"
+  color?: string
+  fontSize?: string
+  fontFamily?: string
+  width?: string
+  height?: string
+  x?: number
+  y?: number
   order: number
   createdAt: Date
 }
@@ -273,6 +295,9 @@ export interface IItineraryEvent {
   | "ancillaries"
   | "cruise"
   | "fixed-schedule"
+  | "fixedSchedule"
+  | "availability-calendar"
+  | "additionalInformation"
   title: string
   description: string
   time?: string
@@ -632,7 +657,7 @@ const ItinerarySchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["fixed-group-tour", "customized-package", "cart-combo", "html-editor"],
+      enum: ["fixed-group-tour", "customized-package", "cart-combo", "html-editor", "fully-editor"],
       default: "customized-package",
     },
     createdBy: { type: String },
@@ -802,9 +827,6 @@ const ItinerarySchema = new mongoose.Schema(
 
         // Extended Ancillaries Fields
         visaCountry: String, // mapped to country usually but specific field here just in case
-        visaDuration: String,
-        serviceCharge: Number, // Shared with Others
-        entryMethod: String,
         departureDate: String,
         returnDate: String,
         baseCurrency: String,
@@ -820,15 +842,38 @@ const ItinerarySchema = new mongoose.Schema(
         id: { type: String, required: true },
         type: {
           type: String,
-          enum: ["heading", "paragraph", "list", "image", "divider", "quote", "table"],
+          enum: ["heading", "paragraph", "list", "image", "divider", "quote", "table", "gallery", "video", "callout", "spacer"],
           required: true,
         },
         content: String,
         level: Number,
         listType: { type: String, enum: ["ordered", "unordered"] },
         items: [String],
+        galleryItems: [
+          {
+            url: String,
+            width: String,
+            height: String,
+            order: Number
+          }
+        ],
+        tableData: [[String]],
         imageUrl: String,
+        videoUrl: String,
         imageCaption: String,
+        calloutType: { type: String, enum: ["info", "warning", "success", "error"] },
+        bold: Boolean,
+        italic: Boolean,
+        underline: Boolean,
+        align: { type: String, enum: ["left", "center", "right", "justify"] },
+        float: { type: String, enum: ["none", "left", "right"], default: "none" },
+        color: String,
+        fontSize: String,
+        fontFamily: String,
+        width: String,
+        height: String,
+        x: Number,
+        y: Number,
         order: { type: Number, required: true },
         createdAt: { type: Date, default: Date.now },
       },

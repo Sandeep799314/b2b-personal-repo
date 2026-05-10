@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { writeFile } from 'fs/promises'
 import { join } from 'path'
+import { verifyAuth } from '@/lib/server-auth'
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const data = await request.formData()
     const file: File | null = data.get('file') as unknown as File
 

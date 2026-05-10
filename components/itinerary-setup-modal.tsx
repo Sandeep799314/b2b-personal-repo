@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { getAuthHeaders } from "@/lib/client-auth"
 
-export type ItineraryType = "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor"
+export type ItineraryType = "fixed-group-tour" | "customized-package" | "cart-combo" | "html-editor" | "fully-editor"
 
 export interface ItinerarySetupResult {
 	itineraryType: ItineraryType
@@ -96,6 +96,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			"customized-package": "CUS",
 			"cart-combo": "CRT",
 			"html-editor": "HTM",
+			"fully-editor": "FLT",
 		}[itineraryType]
 
 		return `${prefix}-${Date.now().toString(36).toUpperCase()}`
@@ -124,7 +125,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 			return
 		}
 
-		if ((itineraryType === "customized-package" || itineraryType === "html-editor") && !formData.days) {
+		if ((itineraryType === "customized-package" || itineraryType === "html-editor" || itineraryType === "fully-editor") && !formData.days) {
 			toast({
 				title: "Duration Missing",
 				description: "Please specify number of days",
@@ -294,6 +295,18 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 										<div className="text-xs text-muted-foreground">Block-based editor</div>
 									</div>
 								</Button>
+
+								<Button
+									variant={itineraryType === "fully-editor" ? "default" : "outline"}
+									onClick={() => setItineraryType("fully-editor")}
+									className="h-auto p-4 flex flex-col items-center gap-2"
+								>
+									<FileText size={20} />
+									<div className="text-center">
+										<div className="font-medium">Fully Editor</div>
+										<div className="text-xs text-muted-foreground">Canvas-based editor</div>
+									</div>
+								</Button>
 							</div>
 						</div>
 
@@ -398,7 +411,7 @@ export function ItinerarySetupModal({ isOpen, onClose, onCreate, onCopy }: Itine
 							</div>
 						)}
 
-						{(itineraryType === "customized-package" || itineraryType === "html-editor") && (
+						{(itineraryType === "customized-package" || itineraryType === "html-editor" || itineraryType === "fully-editor") && (
 							<div className="space-y-4 border-t pt-4">
 								<h4 className="font-medium flex items-center gap-2">
 									<Clock size={16} />

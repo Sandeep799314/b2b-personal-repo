@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectToDatabase } from "@/lib/mongodb"
 import PublicShare, { ShareView } from "@/models/PublicShare"
+import { verifyAuth } from "@/lib/server-auth"
 
-// GET /api/shares/[shareId] - Get specific share
+// GET /api/shares/[shareId] - Get specific share (Public access allowed)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ shareId: string }> }
@@ -65,6 +66,12 @@ export async function PUT(
   { params }: { params: Promise<{ shareId: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectToDatabase()
 
     const { shareId } = await params
@@ -79,6 +86,11 @@ export async function PUT(
       )
     }
 
+    // Check ownership
+    if (share.createdBy !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this share" }, { status: 403 });
+    }
+
     // Build update object
     const updateData: any = {}
 
@@ -91,7 +103,6 @@ export async function PUT(
     if (body.itineraryId !== undefined) updateData.itineraryId = body.itineraryId || null
     if (body.itineraryIds !== undefined) updateData.itineraryIds = body.itineraryIds
 
-    console.log('[API PUT] Update data:', JSON.stringify(updateData, null, 2))
     if (body.isActive !== undefined) updateData.isActive = body.isActive
     if (body.expiresAt !== undefined) {
       updateData.expiresAt = body.expiresAt ? new Date(body.expiresAt) : null
@@ -135,7 +146,7 @@ export async function PUT(
     const updatedShare = await PublicShare.findOneAndUpdate(
       { shareId },
       { $set: updateData },
-      { new: true, runValidators: false } // Disable validators to avoid slug required error
+      { new: true, runValidators: false }
     ).populate([
       {
         path: 'itineraryId',
@@ -174,6 +185,12 @@ export async function DELETE(
   { params }: { params: Promise<{ shareId: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     await connectToDatabase()
 
     const { shareId } = await params
@@ -187,19 +204,20 @@ export async function DELETE(
       )
     }
 
-    // TODO: Add authorization check - only creator can delete
+    // Check ownership
+    if (share.createdBy !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this share" }, { status: 403 });
+    }
 
     await PublicShare.findOneAndDelete({ shareId })
 
     // Optional: Also delete related share views
-    // Use a separate try-catch to ensure main deletion succeeds even if this fails
     try {
       if (ShareView) {
         await ShareView.deleteMany({ shareId })
       }
     } catch (viewError) {
       console.error("Error deleting share views:", viewError)
-      // Continue execution, don't fail the request
     }
 
     return NextResponse.json({

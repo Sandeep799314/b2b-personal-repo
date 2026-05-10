@@ -300,6 +300,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   const [highlights, setHighlights] = useState<string[]>(initialHighlights || [])
   const [images, setImages] = useState<string[]>(initialImages || [])
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  const [lastAddedEventId, setLastAddedEventId] = useState<string | null>(null)
   
   const isInitialLoad = useRef(true)
   
@@ -986,8 +987,8 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
   }
 
   const addHighlight = (highlight: string) => {
-    if (!highlightOptions.includes(highlight)) {
-      setHighlightOptions([...highlightOptions, highlight])
+    if (!highlights.includes(highlight)) {
+      setHighlights([...highlights, highlight])
       setNewHighlight("")
     }
   }
@@ -1270,6 +1271,64 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
     // Cast to any to access properties since strict typing is union
     ; (newDays[dayIndex].meals as any)[meal] = value
     setDays(newDays)
+  }
+
+  const handleQuickAddNote = (dayIndex: number) => {
+    if (readOnly) return
+
+    // 1. Cleanup previous empty note
+    let updatedDays = [...days]
+    let removed = false
+
+    if (lastAddedEventId) {
+      updatedDays = updatedDays.map((day) => ({
+        ...day,
+        events: day.events.filter((e) => {
+          if (e.id === lastAddedEventId) {
+            const isEmpty = (!e.description || e.description.trim() === "") && (e.title === "Note" || e.title === "New Note")
+            if (isEmpty) {
+              removed = true
+              return false
+            }
+          }
+          return true
+        }),
+      }))
+    }
+
+    // 2. Add new note
+    const newId = `event-${Date.now()}`
+    const newNote: IItineraryEvent = {
+      id: newId,
+      category: "note",
+      title: "Note",
+      description: "",
+      time: "09:00",
+      componentSource: "manual",
+    } as IItineraryEvent
+
+    updatedDays[dayIndex].events.push(newNote)
+    
+    // Sort events: Notes first
+    updatedDays[dayIndex].events.sort((a, b) => {
+      if (a.category === "note" && b.category !== "note") return -1
+      if (a.category !== "note" && b.category === "note") return 1
+      return 0
+    })
+
+    setDays(updatedDays)
+    setLastAddedEventId(newId)
+    setHasChanges(true)
+  }
+
+  const updateEventContent = (dayIndex: number, eventIndex: number, updates: Partial<IItineraryEvent>) => {
+    const newDays = [...days]
+    newDays[dayIndex].events[eventIndex] = {
+      ...newDays[dayIndex].events[eventIndex],
+      ...updates,
+    }
+    setDays(newDays)
+    setHasChanges(true)
   }
 
   const toggleDayCollapse = (dayIndex: number) => {
@@ -2713,12 +2772,17 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
               </div>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
+            <div className={cn("flex shrink-0", mode === 'quotation' ? "flex-col gap-2 items-stretch" : "items-center gap-3")}>
+              {extraActions}
               {!readOnly && (
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving}
-                  className={`${showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]'} text-white shadow-md transition-all duration-300 px-6 h-10 lg:h-12 rounded-xl`}
+                  className={cn(
+                    showSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#2D7CEA] hover:bg-[#1e63c7]',
+                    "text-white shadow-md transition-all duration-300 px-6 font-bold rounded-xl",
+                    mode === 'quotation' ? "h-9 text-xs" : "h-10 lg:h-12"
+                  )}
                 >
                   {isSaving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -3264,22 +3328,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
 
             {/* Fixed Dates Card - Appears Below Overview */}
             <Card
-              className={`relative border-2 ${dropTarget?.dayIndex === -3 ? "border-blue-400" : "border-indigo-200"} bg-white overflow-hidden rounded-xl shadow-sm`}
+              className={`relative border ${dropTarget?.dayIndex === -3 ? "border-blue-400" : "border-indigo-100"} bg-white overflow-hidden rounded-lg shadow-sm`}
               onDragOver={(e) => {
                 e.preventDefault()
                 handleDragOver(-3, fixedScheduleEvents.length)
               }}
               onDrop={() => handleDrop(-3, fixedScheduleEvents.length)}
             >
-              <CardHeader className="pb-2 pt-3 px-3 lg:px-4 bg-indigo-50/30 border-b border-indigo-100">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+              <CardHeader className="py-1.5 px-2 lg:px-3 bg-indigo-50/10 border-b border-indigo-100/50">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
                     {fixedScheduleEvents.length > 0 && (
                       <>
-                        <div className="p-1.5 bg-indigo-100 rounded-lg">
-                          <Calendar className="h-4 w-4 lg:h-5 lg:w-5 text-indigo-600" />
+                        <div className="p-1 bg-indigo-100/50 rounded-md">
+                          <Calendar className="h-3.5 w-3.5 text-indigo-600" />
                         </div>
-                        <h3 className="text-base lg:text-lg font-bold text-indigo-900 tracking-tight uppercase">Fixed Dates</h3>
+                        <h3 className="text-xs font-black text-indigo-900 uppercase tracking-wider">Fixed Dates</h3>
                       </>
                     )}
                   </div>
@@ -3305,22 +3369,22 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                         eventIndex: updatedFixedScheduleEvents.length - 1,
                       })
                     }}
-                    className="text-xs lg:text-sm w-full sm:w-auto h-8 lg:h-9 bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold"
+                    className="text-[10px] h-7 px-2 bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700 font-bold"
                   >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    <Plus className="h-3 w-3 mr-1" />
                     Add Dates
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-3 px-3 lg:px-4 pb-3">
+              <CardContent className="p-1 lg:p-1.5">
                 {fixedScheduleEvents.length === 0 ? (
-                  <div className="text-center py-6 px-4 border-2 border-dashed border-indigo-100 rounded-xl bg-gray-50/50">
-                    <p className="text-xs lg:text-sm text-indigo-400 font-medium">
-                      Drag a <strong>Fixed Dates</strong> component here or click <strong>Add Dates</strong>
+                  <div className="text-center py-2 px-3 border border-dashed border-indigo-100 rounded-lg bg-gray-50/30">
+                    <p className="text-[10px] text-indigo-400 font-semibold">
+                      Drag <strong>Fixed Dates</strong> or click <strong>Add</strong>
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap items-start gap-6">
+                  <div className="flex flex-wrap items-start gap-1">
                     {(() => {
                       // Group events by month
                       const sortedEvents = [...fixedScheduleEvents].sort((a, b) => {
@@ -3337,7 +3401,7 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                           try {
                             const d = new Date(dateStr)
                             if (!isNaN(d.getTime())) {
-                              month = d.toLocaleString('default', { month: 'short', year: 'numeric' }).toUpperCase()
+                              month = d.toLocaleString('default', { month: 'short' }).toUpperCase()
                             }
                           } catch (e) { }
                         }
@@ -3354,13 +3418,13 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                       })
 
                       return groups.map((group, gIdx) => (
-                        <div key={`group-${group.month}-${gIdx}`} className="flex items-start gap-3 bg-neutral-50/50 p-2 rounded-2xl border border-neutral-100">
-                          <div className="flex flex-col items-center justify-center self-stretch px-1.5 border-r-2 border-indigo-200/50 bg-indigo-50/30 rounded-l-xl">
-                            <span className="text-[9px] font-black text-indigo-500 [writing-mode:vertical-lr] rotate-180 uppercase tracking-[0.2em] py-3 whitespace-nowrap">
+                        <div key={`group-${group.month}-${gIdx}`} className="flex items-start gap-1 bg-neutral-50/30 p-1 rounded-lg border border-neutral-100">
+                          <div className="flex flex-col items-center justify-center self-stretch px-0.5 border-r border-indigo-200/30 bg-indigo-50/20 rounded-l-md">
+                            <span className="text-[7px] font-black text-indigo-500 [writing-mode:vertical-lr] rotate-180 uppercase tracking-tighter py-1 whitespace-nowrap">
                               {group.month}
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-2 lg:gap-3 py-1 pr-1">
+                          <div className="flex flex-wrap gap-1 py-0.5 pr-0.5">
                             {group.events.map(({ event, index }) => (
                               <div key={`fixed-wrapper-${event.id}-${index}`} className="group relative">
                                 <EventCard
@@ -3379,7 +3443,6 @@ export const ItineraryBuilder = forwardRef<any, ItineraryBuilderProps>(
                                       eventIndex: index,
                                       event: { ...event }
                                     })
-                                    setIsEditModalOpen(true)
                                   }}
                                   onDelete={() => {
                                     const newEvents = [...fixedScheduleEvents]

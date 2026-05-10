@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { verifyAuth } from "@/lib/server-auth"
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const user = await verifyAuth(req);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { messages } = await req.json()
     const apiKey = process.env.GROQ_API_KEY
 

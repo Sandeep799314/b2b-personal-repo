@@ -31,6 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (!auth) {
+            setIsLoading(false);
+            return;
+        }
+
         // Handle redirect result
         getRedirectResult(auth).catch((error) => {
             console.error('Error getting redirect result:', error);
@@ -56,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, []);
 
     async function signInWithGoogle() {
+        if (!auth) {
+            throw new Error('Firebase Auth is not initialized. Please check your configuration.');
+        }
         try {
             const provider = new GoogleAuthProvider();
             provider.setCustomParameters({
@@ -80,6 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function signInWithEmailPassword(email: string, password: string) {
+        if (!auth) {
+            throw new Error('Firebase Auth is not initialized. Please check your configuration.');
+        }
         try {
             await signInWithEmailAndPassword(auth, email, password);
         } catch (error) {
@@ -89,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function signUpWithEmailPassword(email: string, password: string) {
+        if (!auth) {
+            throw new Error('Firebase Auth is not initialized. Please check your configuration.');
+        }
         try {
             await createUserWithEmailAndPassword(auth, email, password);
         } catch (error) {
@@ -98,6 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function signOut() {
+        if (!auth) {
+            console.warn('Firebase Auth is not initialized during signOut');
+            return;
+        }
         try {
             await firebaseSignOut(auth);
             // Cookie will be cleared by onAuthStateChanged listener

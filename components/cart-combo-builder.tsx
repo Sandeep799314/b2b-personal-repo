@@ -71,7 +71,14 @@ import {
 
 interface CartComboBuilderProps {
   itineraryId?: string
+  quotationId?: string
+  mode?: "itinerary" | "quotation"
   onBack: () => void
+  onSave?: (data?: any) => Promise<void>
+  readOnly?: boolean
+  initialCartItems?: ICartItem[]
+  initialTitle?: string
+  initialDescription?: string
 }
 
 const CATEGORY_ICONS = {
@@ -472,12 +479,22 @@ function CartItemCard({
   );
 }
 
-export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps) {
+export function CartComboBuilder({ 
+  itineraryId, 
+  quotationId,
+  mode = "itinerary",
+  onBack, 
+  onSave,
+  readOnly = false,
+  initialCartItems,
+  initialTitle,
+  initialDescription
+}: CartComboBuilderProps) {
   const { toast } = useToast()
-  const [title, setTitle] = useState("New Cart/Combo")
-  const [description, setDescription] = useState("")
+  const [title, setTitle] = useState(initialTitle || "New Cart/Combo")
+  const [description, setDescription] = useState(initialDescription || "")
   const [productId, setProductId] = useState(`CRT-${Date.now().toString(36).toUpperCase()}`)
-  const [cartItems, setCartItems] = useState<ICartItem[]>([])
+  const [cartItems, setCartItems] = useState<ICartItem[]>(initialCartItems || [])
   const [showAddItemForm, setShowAddItemForm] = useState(false)
   const [editingItem, setEditingItem] = useState<ICartItem | null>(null)
   const [isSidebarMinimized, setIsSidebarMinimized] = useState(false)
@@ -500,6 +517,25 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
   const [pricingNationality, setPricingNationality] = useState("Indian")
   const [pricingStartDate, setPricingStartDate] = useState("")
   const [pricingEndDate, setPricingEndDate] = useState("")
+
+  // Sync state when initial props change (especially for version changes in quotation mode)
+  useEffect(() => {
+    if (initialCartItems) {
+      setCartItems(initialCartItems)
+    }
+  }, [initialCartItems])
+
+  useEffect(() => {
+    if (initialTitle !== undefined) {
+      setTitle(initialTitle || "")
+    }
+  }, [initialTitle])
+
+  useEffect(() => {
+    if (initialDescription !== undefined) {
+      setDescription(initialDescription || "")
+    }
+  }, [initialDescription])
 
   const handleCreateCopy = () => {
     toast({
@@ -887,6 +923,14 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
         gallery,
       }
 
+      if (mode === "quotation" && onSave) {
+        await onSave(itineraryData);
+        setIsSaving(false);
+        setShowSaved(true);
+        setTimeout(() => setShowSaved(false), 2000);
+        return;
+      }
+
       const url = itineraryId ? `/api/itineraries/${itineraryId}` : "/api/itineraries"
       const method = itineraryId ? "PUT" : "POST"
 
@@ -901,10 +945,19 @@ export function CartComboBuilder({ itineraryId, onBack }: CartComboBuilderProps)
       })
 
       if (response.ok) {
+        const result = await response.json();
         toast({
           title: "Success",
           description: `Cart/Combo ${itineraryId ? "updated" : "created"} successfully`,
         })
+        
+        if (onSave) {
+          await onSave({
+            ...itineraryData,
+            itineraryId: result._id
+          });
+        }
+        
         setShowSaved(true)
         setTimeout(() => setShowSaved(false), 2000)
       } else {

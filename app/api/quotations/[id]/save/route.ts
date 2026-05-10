@@ -2,38 +2,48 @@ import { NextRequest, NextResponse } from "next/server"
 import connectDB from "@/lib/mongodb"
 import Quotation from "@/models/Quotation"
 import { isValidObjectId } from "mongoose"
+import { verifyAuth } from "@/lib/server-auth"
 
 // Helper to capture a full snapshot of the quotation state
 const snapshotQuotationState = (q: any) => {
+  // Convert to plain object if it's a Mongoose document
+  const doc = q.toObject ? q.toObject() : q;
+  
   return {
-    days: q.days || [],
-    pricingOptions: q.pricingOptions || {},
-    subtotal: q.subtotal || 0,
-    markup: q.markup || 0,
-    total: q.total || 0,
-    currencySettings: q.currencySettings || {},
-    title: q.title || "",
-    description: q.description || "",
-    countries: q.countries || [],
-    destination: q.destination || "",
-    duration: q.duration || "",
-    totalPrice: q.totalPrice || 0,
-    currency: q.currency || "USD",
-    type: q.type || "customized-package",
-    cartItems: q.cartItems || [],
-    htmlContent: q.htmlContent || "",
-    htmlBlocks: q.htmlBlocks || [],
-    serviceSlots: q.serviceSlots || [],
-    branding: q.branding || {},
-    gallery: q.gallery || [],
-    highlights: q.highlights || [],
-    images: q.images || [],
-    overviewEvents: q.overviewEvents || [],
-    notes: q.notes || "",
-    productId: q.productId || "",
-    productReferenceCode: q.productReferenceCode || ""
+    days: doc.days || [],
+    pricingOptions: doc.pricingOptions || {},
+    subtotal: doc.subtotal || 0,
+    markup: doc.markup || 0,
+    total: doc.total || 0,
+    currencySettings: doc.currencySettings || {},
+    title: doc.title || "",
+    description: doc.description || "",
+    countries: doc.countries || [],
+    destination: doc.destination || "",
+    duration: doc.duration || "",
+    totalPrice: doc.totalPrice || 0,
+    currency: doc.currency || "USD",
+    type: doc.type || "customized-package",
+    cartItems: doc.cartItems || [],
+    htmlContent: doc.htmlContent || "",
+    htmlBlocks: doc.htmlBlocks || [],
+    serviceSlots: doc.serviceSlots || [],
+    branding: doc.branding || {},
+    gallery: doc.gallery || [],
+    highlights: doc.highlights || [],
+    images: doc.images || [],
+    overviewEvents: doc.overviewEvents || [],
+    fixedScheduleEvents: doc.fixedScheduleEvents || [],
+    guestDetails: doc.guestDetails || {},
+    agencyDetails: doc.agencyDetails || {},
+    headerFooter: doc.headerFooter || {},
+    notes: doc.notes || "",
+    productId: doc.productId || "",
+    productReferenceCode: doc.productReferenceCode || "",
+    queryStatus: doc.queryStatus || "pending"
   }
 }
+
 
 // POST /api/quotations/[id]/save
 export async function POST(
@@ -41,6 +51,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Verify authentication
+    const user = await verifyAuth(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Connect to database
     await connectDB()
 
@@ -66,6 +82,11 @@ export async function POST(
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
+    // Check ownership
+    if (quotation.userId !== user.uid) {
+      return NextResponse.json({ error: "Unauthorized - You do not own this quotation" }, { status: 403 });
+    }
+
     // 1. Initialize version history if it doesn't exist
     if (!quotation.versionHistory || quotation.versionHistory.length === 0) {
       console.log(`[QUOTATION SAVE] Initializing version history for quotation ${id}`);
@@ -81,7 +102,8 @@ export async function POST(
     }
 
     // 2. Capture the state BEFORE applying updates (this belongs to the current version)
-    const stateBeforeUpdate = snapshotQuotationState(quotation)
+    // Actually, we usually want the state AFTER update for the current version's state
+    // but we can keep it as is if that's the intended logic.
 
     // Get the current version index
     let currentVersion = quotation.currentVersion || 1
@@ -103,7 +125,8 @@ export async function POST(
         "validUntil", "totalPrice", "destination", "countries", "duration",
         "currency", "type", "cartItems", "htmlContent", "htmlBlocks",
         "serviceSlots", "branding", "gallery", "highlights", "images",
-        "overviewEvents", "productId", "productReferenceCode"
+        "overviewEvents", "fixedScheduleEvents", "guestDetails", "agencyDetails", 
+        "headerFooter", "productId", "productReferenceCode", "queryStatus"
       ];
 
       allowedUpdates.forEach(key => {
@@ -130,6 +153,10 @@ export async function POST(
     quotation.markModified("branding")
     quotation.markModified("serviceSlots")
     quotation.markModified("overviewEvents")
+    quotation.markModified("fixedScheduleEvents")
+    quotation.markModified("guestDetails")
+    quotation.markModified("agencyDetails")
+    quotation.markModified("headerFooter")
     quotation.markModified("currencySettings")
 
     // Save changes
